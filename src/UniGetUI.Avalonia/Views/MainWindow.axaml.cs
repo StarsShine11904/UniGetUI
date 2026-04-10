@@ -18,6 +18,7 @@ public partial class MainWindow : Window
     private PackagesPage? _discoverPage;
     private PackagesPage? _updatesPage;
     private PackagesPage? _installedPage;
+    private PolicyEditorPage? _policyEditorPage;
     private SettingsPage? _settingsPage;
 
 
@@ -60,6 +61,8 @@ public partial class MainWindow : Window
             _installedPage.OnOperationCreated = AddOperation;
             _installedPage.OnPackageDetailsRequested = ShowPackageDetails;
             _installedPage.OnInstallOptionsRequested = ShowInstallOptions;
+
+            _policyEditorPage = new PolicyEditorPage();
 
             _settingsPage = new SettingsPage();
 
@@ -196,6 +199,7 @@ public partial class MainWindow : Window
             "Discover" => _discoverPage,
             "Updates" => _updatesPage,
             "Installed" => _installedPage,
+            "PolicyEditor" => _policyEditorPage,
             "Settings" => _settingsPage,
             _ => null
         };

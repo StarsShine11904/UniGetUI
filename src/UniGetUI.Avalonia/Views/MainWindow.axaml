@@ -38,6 +38,11 @@
                             <fa:SymbolIconSource Symbol="List" />
                         </fa:NavigationViewItem.IconSource>
                     </fa:NavigationViewItem>
+                    <fa:NavigationViewItem Content="Policy Editor" Tag="PolicyEditor">
+                        <fa:NavigationViewItem.IconSource>
+                            <fa:SymbolIconSource Symbol="Permissions" />
+                        </fa:NavigationViewItem.IconSource>
+                    </fa:NavigationViewItem>
                 </fa:NavigationView.MenuItems>
 
                 <fa:NavigationView.FooterMenuItems>
