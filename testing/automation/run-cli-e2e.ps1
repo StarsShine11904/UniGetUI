@@ -17,10 +17,37 @@ function Resolve-BuildArtifact {
     $separator = [System.IO.Path]::DirectorySeparatorChar
     $configurationSegment = [string]::Concat($separator, $configuration, $separator)
     $targetFrameworkSegment = [string]::Concat($separator, 'net10.0', $separator)
+    $processArchitecture = [System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString().ToLowerInvariant()
+    $processArchitectureSegment = [string]::Concat($separator, $processArchitecture, $separator)
+    $knownArchitectureSegments = @('x86', 'x64', 'arm64') | ForEach-Object {
+        [string]::Concat($separator, $_, $separator)
+    }
 
     $candidate = Get-ChildItem -Path $binRoot -Recurse -Filter $AssemblyName -File -ErrorAction SilentlyContinue |
         Where-Object { $_.FullName.Contains($configurationSegment) -and $_.FullName.Contains($targetFrameworkSegment) } |
-        Sort-Object LastWriteTimeUtc -Descending |
+        Sort-Object `
+            @{ Expression = {
+                    if ($_.FullName.Contains($processArchitectureSegment)) {
+                        2
+                    }
+                    else {
+                        $hasDifferentArchitectureSegment = $false
+                        foreach ($architectureSegment in $knownArchitectureSegments) {
+                            if ($architectureSegment -ne $processArchitectureSegment -and $_.FullName.Contains($architectureSegment)) {
+                                $hasDifferentArchitectureSegment = $true
+                                break
+                            }
+                        }
+
+                        if (-not $hasDifferentArchitectureSegment) {
+                            1
+                        }
+                        else {
+                            0
+                        }
+                    }
+                }; Descending = $true },
+            @{ Expression = 'LastWriteTimeUtc'; Descending = $true } |
         Select-Object -First 1
 
     if ($null -eq $candidate) {
