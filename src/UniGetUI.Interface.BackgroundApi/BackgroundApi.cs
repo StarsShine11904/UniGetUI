@@ -310,7 +310,7 @@ namespace UniGetUI.Interface
             );
         }
 
-        private async Task HandlePackageActionAsync(
+        private static async Task HandlePackageActionAsync(
             HttpContext context,
             Func<AutomationPackageActionRequest, Task<AutomationPackageOperationResult>> action
         )

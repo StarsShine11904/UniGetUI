@@ -72,16 +72,7 @@ public static class TelemetryHandler
     private const string IndexPrefix = "";
 #endif
 
-    private static readonly HttpClient _httpClient;
-
-    static TelemetryHandler()
-    {
-        _httpClient = new HttpClient(CoreTools.GenericHttpClientParameters)
-        {
-            Timeout = TimeSpan.FromSeconds(30),
-        };
-        _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(CoreData.UserAgentString);
-    }
+    private static readonly HttpClient _httpClient = CreateHttpClient();
 
     private static readonly Settings.K[] SettingsToSend =
     [
@@ -100,6 +91,16 @@ public static class TelemetryHandler
     ];
 
     // -------------------------------------------------------------------------
+
+    private static HttpClient CreateHttpClient()
+    {
+        var httpClient = new HttpClient(CoreTools.GenericHttpClientParameters)
+        {
+            Timeout = TimeSpan.FromSeconds(30),
+        };
+        httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(CoreData.UserAgentString);
+        return httpClient;
+    }
 
     public static async Task InitializeAsync()
     {

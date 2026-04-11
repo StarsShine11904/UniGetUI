@@ -78,6 +78,33 @@ try {
         return $text | ConvertFrom-Json
     }
 
+    function Wait-ForCliCondition {
+        param(
+            [Parameter(Mandatory = $true)]
+            [string[]] $Arguments,
+            [Parameter(Mandatory = $true)]
+            [scriptblock] $Condition,
+            [Parameter(Mandatory = $true)]
+            [string] $FailureMessage,
+            [int] $TimeoutSeconds = 90,
+            [int] $DelaySeconds = 3
+        )
+
+        $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+        $lastResponse = $null
+
+        do {
+            $lastResponse = Invoke-CliJson -Arguments $Arguments
+            if (& $Condition $lastResponse) {
+                return $lastResponse
+            }
+
+            Start-Sleep -Seconds $DelaySeconds
+        } while ((Get-Date) -lt $deadline)
+
+        throw "$FailureMessage`nLast payload: $($lastResponse | ConvertTo-Json -Depth 8)"
+    }
+
     $deadline = (Get-Date).AddMinutes(2)
     do {
         Start-Sleep -Seconds 2
@@ -106,53 +133,69 @@ try {
         throw "install-package failed: $($install | ConvertTo-Json -Depth 8)"
     }
 
-    $installed = Invoke-CliJson -Arguments @('list-installed', '--manager', '.NET Tool')
+    $installed = Wait-ForCliCondition `
+        -Arguments @('list-installed', '--manager', '.NET Tool') `
+        -FailureMessage 'list-installed did not include dotnetsay after installation' `
+        -Condition {
+            param($response)
+            @($response.packages | Where-Object { $_.id -eq 'dotnetsay' }).Count -gt 0
+        }
     $installedDotnetsay = @($installed.packages | Where-Object { $_.id -eq 'dotnetsay' })
-    if ($installedDotnetsay.Count -eq 0) {
-        throw "list-installed did not include dotnetsay after installation"
-    }
 
-    if (-not ($installedDotnetsay.version -contains '2.1.4')) {
-        throw "Expected dotnetsay version 2.1.4 after install. Found: $($installedDotnetsay.version -join ', ')"
-    }
+    $installed = Wait-ForCliCondition `
+        -Arguments @('list-installed', '--manager', '.NET Tool') `
+        -FailureMessage 'dotnetsay did not report version 2.1.4 after installation' `
+        -Condition {
+            param($response)
+            @($response.packages | Where-Object { $_.id -eq 'dotnetsay' -and $_.version -eq '2.1.4' }).Count -gt 0
+        }
+    $installedDotnetsay = @($installed.packages | Where-Object { $_.id -eq 'dotnetsay' })
 
-    $updates = Invoke-CliJson -Arguments @('get-updates', '--manager', '.NET Tool')
+    $updates = Wait-ForCliCondition `
+        -Arguments @('get-updates', '--manager', '.NET Tool') `
+        -FailureMessage 'get-updates did not report dotnetsay after installing 2.1.4' `
+        -Condition {
+            param($response)
+            @($response.updates | Where-Object { $_.id -eq 'dotnetsay' }).Count -gt 0
+        }
     $updatableDotnetsay = @($updates.updates | Where-Object { $_.id -eq 'dotnetsay' })
-    if ($updatableDotnetsay.Count -eq 0) {
-        throw "get-updates did not report dotnetsay after installing 2.1.4"
-    }
 
     $update = Invoke-CliJson -Arguments @('update-package', '--manager', '.NET Tool', '--package-id', 'dotnetsay')
     if ($update.status -ne 'success') {
         throw "update-package failed: $($update | ConvertTo-Json -Depth 8)"
     }
 
-    $installedAfterUpdate = Invoke-CliJson -Arguments @('list-installed', '--manager', '.NET Tool')
+    $installedAfterUpdate = Wait-ForCliCondition `
+        -Arguments @('list-installed', '--manager', '.NET Tool') `
+        -FailureMessage 'list-installed did not include an updated dotnetsay version after update' `
+        -Condition {
+            param($response)
+            @($response.packages | Where-Object { $_.id -eq 'dotnetsay' -and $_.version -ne '2.1.4' }).Count -gt 0
+        }
     $updatedDotnetsay = @($installedAfterUpdate.packages | Where-Object { $_.id -eq 'dotnetsay' })
-    if ($updatedDotnetsay.Count -eq 0) {
-        throw "list-installed did not include dotnetsay after update"
-    }
 
-    if ($updatedDotnetsay.version -contains '2.1.4') {
-        throw "dotnetsay still reports version 2.1.4 after update"
-    }
-
-    $updatesAfterUpdate = Invoke-CliJson -Arguments @('get-updates', '--manager', '.NET Tool')
+    $updatesAfterUpdate = Wait-ForCliCondition `
+        -Arguments @('get-updates', '--manager', '.NET Tool') `
+        -FailureMessage 'dotnetsay still appears in get-updates after update' `
+        -Condition {
+            param($response)
+            @($response.updates | Where-Object { $_.id -eq 'dotnetsay' }).Count -eq 0
+        }
     $remainingDotnetsayUpdate = @($updatesAfterUpdate.updates | Where-Object { $_.id -eq 'dotnetsay' })
-    if ($remainingDotnetsayUpdate.Count -ne 0) {
-        throw "dotnetsay still appears in get-updates after update"
-    }
 
     $uninstall = Invoke-CliJson -Arguments @('uninstall-package', '--manager', '.NET Tool', '--package-id', 'dotnetsay', '--scope', 'Global')
     if ($uninstall.status -ne 'success') {
         throw "uninstall-package failed: $($uninstall | ConvertTo-Json -Depth 8)"
     }
 
-    $installedAfterUninstall = Invoke-CliJson -Arguments @('list-installed', '--manager', '.NET Tool')
+    $installedAfterUninstall = Wait-ForCliCondition `
+        -Arguments @('list-installed', '--manager', '.NET Tool') `
+        -FailureMessage 'dotnetsay still appears in list-installed after uninstall' `
+        -Condition {
+            param($response)
+            @($response.packages | Where-Object { $_.id -eq 'dotnetsay' }).Count -eq 0
+        }
     $remainingDotnetsay = @($installedAfterUninstall.packages | Where-Object { $_.id -eq 'dotnetsay' })
-    if ($remainingDotnetsay.Count -ne 0) {
-        throw "dotnetsay still appears in list-installed after uninstall"
-    }
 }
 finally {
     Stop-Daemon
