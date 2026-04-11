@@ -2,6 +2,7 @@ using UniGetUI.Core.Logging;
 using UniGetUI.PackageEngine;
 using UniGetUI.PackageEngine.Enums;
 using UniGetUI.PackageEngine.Interfaces;
+using UniGetUI.PackageEngine.PackageLoader;
 using UniGetUI.PackageEngine.PackageClasses;
 using UniGetUI.PackageEngine.Operations;
 using UniGetUI.PackageEngine.Serializable;
@@ -64,8 +65,7 @@ public static class AutomationPackageApi
 
     public static IReadOnlyList<AutomationPackageInfo> ListInstalledPackages(string? managerName = null)
     {
-        return GetManagers(managerName)
-            .SelectMany(manager => manager.GetInstalledPackages())
+        return GetInstalledPackagesSnapshot(managerName)
             .DistinctBy(GetPackageIdentity)
             .Select(ToAutomationPackageInfo)
             .OrderBy(package => package.Name, StringComparer.OrdinalIgnoreCase)
@@ -75,8 +75,7 @@ public static class AutomationPackageApi
 
     public static IReadOnlyList<AutomationPackageInfo> ListUpgradablePackages(string? managerName = null)
     {
-        return GetManagers(managerName)
-            .SelectMany(manager => manager.GetAvailableUpdates())
+        return GetUpgradablePackagesSnapshot(managerName)
             .DistinctBy(GetPackageIdentity)
             .Select(ToAutomationPackageInfo)
             .OrderBy(package => package.Name, StringComparer.OrdinalIgnoreCase)
@@ -105,7 +104,7 @@ public static class AutomationPackageApi
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var package = FindUpgradablePackage(request);
+        var package = FindUpgradablePackageOrInstalledPackage(request);
         return ExecuteOperationAsync(
             "update-package",
             package,
@@ -199,15 +198,12 @@ public static class AutomationPackageApi
 
     private static IPackage FindInstalledPackage(AutomationPackageActionRequest request)
     {
-        foreach (var manager in GetManagers(request.ManagerName))
+        var package = GetInstalledPackagesSnapshot(request.ManagerName).FirstOrDefault(candidate =>
+            MatchesIdentity(candidate, request)
+        );
+        if (package is not null)
         {
-            var package = manager.GetInstalledPackages().FirstOrDefault(candidate =>
-                MatchesIdentity(candidate, request)
-            );
-            if (package is not null)
-            {
-                return package;
-            }
+            return package;
         }
 
         throw new InvalidOperationException(
@@ -217,20 +213,85 @@ public static class AutomationPackageApi
 
     private static IPackage FindUpgradablePackage(AutomationPackageActionRequest request)
     {
-        foreach (var manager in GetManagers(request.ManagerName))
+        var package = GetUpgradablePackagesSnapshot(request.ManagerName).FirstOrDefault(candidate =>
+            MatchesIdentity(candidate, request)
+        );
+        if (package is not null)
         {
-            var package = manager.GetAvailableUpdates().FirstOrDefault(candidate =>
-                MatchesIdentity(candidate, request)
-            );
-            if (package is not null)
-            {
-                return package;
-            }
+            return package;
         }
 
         throw new InvalidOperationException(
             $"No upgradable package matching id \"{request.PackageId}\" was found."
         );
+    }
+
+    private static IPackage FindUpgradablePackageOrInstalledPackage(
+        AutomationPackageActionRequest request
+    )
+    {
+        try
+        {
+            return FindUpgradablePackage(request);
+        }
+        catch (InvalidOperationException)
+        {
+            return FindInstalledPackage(request);
+        }
+    }
+
+    private static IReadOnlyList<IPackage> GetInstalledPackagesSnapshot(string? managerName)
+    {
+        var loaderPackages = GetLoaderPackages(
+            InstalledPackagesLoader.Instance,
+            managerName,
+            loader => loader.ReloadPackages()
+        );
+        if (loaderPackages.Count > 0)
+        {
+            return loaderPackages;
+        }
+
+        return GetManagers(managerName).SelectMany(manager => manager.GetInstalledPackages()).ToArray();
+    }
+
+    private static IReadOnlyList<IPackage> GetUpgradablePackagesSnapshot(string? managerName)
+    {
+        var loaderPackages = GetLoaderPackages(
+            UpgradablePackagesLoader.Instance,
+            managerName,
+            loader => loader.ReloadPackages()
+        );
+        if (loaderPackages.Count > 0)
+        {
+            return loaderPackages;
+        }
+
+        return GetManagers(managerName).SelectMany(manager => manager.GetAvailableUpdates()).ToArray();
+    }
+
+    private static IReadOnlyList<IPackage> GetLoaderPackages(
+        AbstractPackageLoader? loader,
+        string? managerName,
+        Func<AbstractPackageLoader, Task> reload
+    )
+    {
+        if (loader is null)
+        {
+            return [];
+        }
+
+        if (loader.Packages.Count > 0)
+        {
+            return loader.Packages.Where(package => MatchesManager(package.Manager, managerName)).ToArray();
+        }
+
+        if (!loader.IsLoaded && !loader.IsLoading)
+        {
+            reload(loader).GetAwaiter().GetResult();
+        }
+
+        return loader.Packages.Where(package => MatchesManager(package.Manager, managerName)).ToArray();
     }
 
     private static IReadOnlyList<IPackageManager> GetManagers(string? managerName)

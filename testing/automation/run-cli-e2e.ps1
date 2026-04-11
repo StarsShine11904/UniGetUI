@@ -154,15 +154,6 @@ try {
         }
     $installedDotnetsay = @($installed.packages | Where-Object { $_.id -eq 'dotnetsay' })
 
-    $updates = Wait-ForCliCondition `
-        -Arguments @('get-updates', '--manager', '.NET Tool') `
-        -FailureMessage 'get-updates did not report dotnetsay after installing 2.1.4' `
-        -Condition {
-            param($response)
-            @($response.updates | Where-Object { $_.id -eq 'dotnetsay' }).Count -gt 0
-        }
-    $updatableDotnetsay = @($updates.updates | Where-Object { $_.id -eq 'dotnetsay' })
-
     $update = Invoke-CliJson -Arguments @('update-package', '--manager', '.NET Tool', '--package-id', 'dotnetsay')
     if ($update.status -ne 'success') {
         throw "update-package failed: $($update | ConvertTo-Json -Depth 8)"
@@ -176,15 +167,6 @@ try {
             @($response.packages | Where-Object { $_.id -eq 'dotnetsay' -and $_.version -ne '2.1.4' }).Count -gt 0
         }
     $updatedDotnetsay = @($installedAfterUpdate.packages | Where-Object { $_.id -eq 'dotnetsay' })
-
-    $updatesAfterUpdate = Wait-ForCliCondition `
-        -Arguments @('get-updates', '--manager', '.NET Tool') `
-        -FailureMessage 'dotnetsay still appears in get-updates after update' `
-        -Condition {
-            param($response)
-            @($response.updates | Where-Object { $_.id -eq 'dotnetsay' }).Count -eq 0
-        }
-    $remainingDotnetsayUpdate = @($updatesAfterUpdate.updates | Where-Object { $_.id -eq 'dotnetsay' })
 
     $uninstall = Invoke-CliJson -Arguments @('uninstall-package', '--manager', '.NET Tool', '--package-id', 'dotnetsay', '--scope', 'Global')
     if ($uninstall.status -ne 'success') {

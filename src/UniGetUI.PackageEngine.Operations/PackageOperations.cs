@@ -341,6 +341,20 @@ namespace UniGetUI.PackageEngine.Operations
                 p.SetTag(PackageTag.Default);
 
             UpgradablePackagesLoader.Instance.Remove(Package);
+            InstalledPackagesLoader.Instance.Remove(Package);
+
+            await InstalledPackagesLoader.Instance.AddForeign(
+                new Package(
+                    Package.Name,
+                    Package.Id,
+                    string.IsNullOrWhiteSpace(Package.NewVersionString)
+                        ? Package.VersionString
+                        : Package.NewVersionString,
+                    Package.Source,
+                    Package.Manager,
+                    Package.OverridenOptions
+                )
+            );
 
             if (Settings.Get(Settings.K.AskToDeleteNewDesktopShortcuts))
             {
