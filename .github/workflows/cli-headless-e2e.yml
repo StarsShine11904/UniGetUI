@@ -1,0 +1,68 @@
+name: CLI Headless E2E
+
+on:
+  push:
+    paths:
+      - 'src/**/*.cs'
+      - 'src/**/*.csproj'
+      - 'src/**/*.props'
+      - 'src/**/*.targets'
+      - 'src/**/*.sln'
+      - 'src/**/*.slnx'
+      - 'testing/automation/**'
+      - '.github/workflows/cli-headless-e2e.yml'
+      - 'global.json'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'src/**/*.cs'
+      - 'src/**/*.csproj'
+      - 'src/**/*.props'
+      - 'src/**/*.targets'
+      - 'src/**/*.sln'
+      - 'src/**/*.slnx'
+      - 'testing/automation/**'
+      - '.github/workflows/cli-headless-e2e.yml'
+      - 'global.json'
+  workflow_dispatch:
+
+jobs:
+  cli-headless-e2e:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+
+    runs-on: ${{ matrix.os }}
+    env:
+      CONFIGURATION: Release
+      NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: ${{ runner.os }}-nuget-e2e-${{ hashFiles('global.json', 'src/**/*.csproj', 'src/**/*.props', 'src/**/*.targets', 'src/**/*.sln', 'src/**/*.slnx') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-e2e-
+
+      - name: Restore Avalonia solution
+        working-directory: src
+        run: dotnet restore UniGetUI.Avalonia.slnx
+
+      - name: Build Avalonia solution
+        working-directory: src
+        run: dotnet build UniGetUI.Avalonia.slnx --no-restore --configuration ${{ env.CONFIGURATION }} --verbosity minimal
+
+      - name: Run headless CLI E2E
+        shell: pwsh
+        run: ./testing/automation/run-cli-e2e.ps1

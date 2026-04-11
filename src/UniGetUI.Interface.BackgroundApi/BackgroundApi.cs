@@ -1,7 +1,9 @@
 using System.Text;
+using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using UniGetUI.Core.Data;
@@ -31,6 +33,8 @@ namespace UniGetUI.Interface
         public event EventHandler<string>? OnUpgradePackage;
 
         private IHost? _host;
+        private BackgroundApiTransportOptions _transportOptions =
+            BackgroundApiTransportOptions.LoadForServer();
 
         public BackgroundApiRunner() { }
 
@@ -41,15 +45,16 @@ namespace UniGetUI.Interface
 
         public async Task Start()
         {
+            _transportOptions = BackgroundApiTransportOptions.LoadForServer();
             ApiTokenHolder.Token = CoreTools.RandomString(64);
             Settings.SetValue(Settings.K.CurrentSessionToken, ApiTokenHolder.Token);
-            Logger.Info("Randomly-generated background API auth token: " + ApiTokenHolder.Token);
+            Logger.Info("Generated a background API auth token for the current session");
 
             var builder = Host.CreateDefaultBuilder();
             builder.ConfigureServices(services => services.AddCors());
             builder.ConfigureWebHostDefaults(webBuilder =>
             {
-                webBuilder.UseKestrel();
+                webBuilder.UseKestrel(serverOptions => ConfigureTransport(serverOptions));
 #if !DEBUG
                 webBuilder.SuppressStatusMessages(true);
 #endif
@@ -62,6 +67,13 @@ namespace UniGetUI.Interface
                     app.UseRouting();
                     app.UseEndpoints(endpoints =>
                     {
+                        endpoints.MapGet("/v3/status", V3_Status);
+                        endpoints.MapGet("/v3/packages/search", V3_SearchPackages);
+                        endpoints.MapGet("/v3/packages/installed", V3_ListInstalledPackages);
+                        endpoints.MapGet("/v3/packages/updates", V3_ListUpgradablePackages);
+                        endpoints.MapPost("/v3/packages/install", V3_InstallPackage);
+                        endpoints.MapPost("/v3/packages/update", V3_UpdatePackage);
+                        endpoints.MapPost("/v3/packages/uninstall", V3_UninstallPackage);
                         // Share endpoints
                         endpoints.MapGet("/v2/show-package", V2_ShowPackage);
                         endpoints.MapGet("/is-running", API_IsRunning);
@@ -89,11 +101,33 @@ namespace UniGetUI.Interface
                         );
                     });
                 });
-                webBuilder.UseUrls("http://localhost:7058");
             });
             _host = builder.Build();
             await _host.StartAsync();
-            Logger.Info("Api running on http://localhost:7058");
+            _transportOptions.Persist();
+            Logger.Info(
+                _transportOptions.TransportKind == BackgroundApiTransportKind.NamedPipe
+                    ? $"Api running on named pipe {_transportOptions.NamedPipeName}"
+                    : $"Api running on {_transportOptions.BaseAddressString}"
+            );
+        }
+
+        private void ConfigureTransport(KestrelServerOptions serverOptions)
+        {
+            if (_transportOptions.TransportKind == BackgroundApiTransportKind.NamedPipe)
+            {
+                serverOptions.ListenNamedPipe(
+                    _transportOptions.NamedPipeName,
+                    listenOptions =>
+                    {
+                        listenOptions.Protocols = HttpProtocols.Http1;
+                    }
+                );
+            }
+            else
+            {
+                serverOptions.ListenLocalhost(_transportOptions.TcpPort);
+            }
         }
 
         private async Task V2_ShowPackage(HttpContext context)
@@ -120,6 +154,31 @@ namespace UniGetUI.Interface
             await context.Response.WriteAsync("{\"status\": \"success\"}");
         }
 
+        private async Task V3_Status(HttpContext context)
+        {
+            await context.Response.WriteAsJsonAsync(
+                new BackgroundApiStatus
+                {
+                    Running = true,
+                    Transport = _transportOptions.TransportKind switch
+                    {
+                        BackgroundApiTransportKind.NamedPipe => "named-pipe",
+                        _ => "tcp",
+                    },
+                    TcpPort = _transportOptions.TcpPort,
+                    NamedPipeName = _transportOptions.NamedPipeName,
+                    BaseAddress = _transportOptions.BaseAddressString,
+                    Version = CoreData.VersionName,
+                    BuildNumber = CoreData.BuildNumber,
+                },
+                new JsonSerializerOptions(SerializationHelpers.DefaultOptions)
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    WriteIndented = true,
+                }
+            );
+        }
+
         private async Task WIDGETS_V1_GetUniGetUIVersion(HttpContext context)
         {
             if (!AuthenticateToken(context.Request.Query["token"]))
@@ -129,6 +188,175 @@ namespace UniGetUI.Interface
             }
 
             await context.Response.WriteAsync(CoreData.BuildNumber.ToString());
+        }
+
+        private async Task V3_SearchPackages(HttpContext context)
+        {
+            if (!AuthenticateToken(context.Request.Query["token"]))
+            {
+                context.Response.StatusCode = 401;
+                return;
+            }
+
+            string query = context.Request.Query["query"].ToString();
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                context.Response.StatusCode = 400;
+                await context.Response.WriteAsync("The query parameter is required.");
+                return;
+            }
+
+            string? manager = context.Request.Query["manager"];
+            int maxResults = 50;
+            if (
+                int.TryParse(context.Request.Query["maxResults"], out int parsedMaxResults)
+                && parsedMaxResults > 0
+            )
+            {
+                maxResults = parsedMaxResults;
+            }
+
+            try
+            {
+                await context.Response.WriteAsJsonAsync(
+                    AutomationPackageApi.SearchPackages(query, manager, maxResults),
+                    new JsonSerializerOptions(SerializationHelpers.DefaultOptions)
+                    {
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                        WriteIndented = true,
+                    }
+                );
+            }
+            catch (InvalidOperationException ex)
+            {
+                context.Response.StatusCode = 400;
+                await context.Response.WriteAsync(ex.Message);
+            }
+        }
+
+        private async Task V3_ListInstalledPackages(HttpContext context)
+        {
+            if (!AuthenticateToken(context.Request.Query["token"]))
+            {
+                context.Response.StatusCode = 401;
+                return;
+            }
+
+            try
+            {
+                await context.Response.WriteAsJsonAsync(
+                    AutomationPackageApi.ListInstalledPackages(context.Request.Query["manager"]),
+                    new JsonSerializerOptions(SerializationHelpers.DefaultOptions)
+                    {
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                        WriteIndented = true,
+                    }
+                );
+            }
+            catch (InvalidOperationException ex)
+            {
+                context.Response.StatusCode = 400;
+                await context.Response.WriteAsync(ex.Message);
+            }
+        }
+
+        private async Task V3_ListUpgradablePackages(HttpContext context)
+        {
+            if (!AuthenticateToken(context.Request.Query["token"]))
+            {
+                context.Response.StatusCode = 401;
+                return;
+            }
+
+            try
+            {
+                await context.Response.WriteAsJsonAsync(
+                    AutomationPackageApi.ListUpgradablePackages(context.Request.Query["manager"]),
+                    new JsonSerializerOptions(SerializationHelpers.DefaultOptions)
+                    {
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                        WriteIndented = true,
+                    }
+                );
+            }
+            catch (InvalidOperationException ex)
+            {
+                context.Response.StatusCode = 400;
+                await context.Response.WriteAsync(ex.Message);
+            }
+        }
+
+        private async Task V3_InstallPackage(HttpContext context)
+        {
+            await HandlePackageActionAsync(
+                context,
+                AutomationPackageApi.InstallPackageAsync
+            );
+        }
+
+        private async Task V3_UpdatePackage(HttpContext context)
+        {
+            await HandlePackageActionAsync(
+                context,
+                AutomationPackageApi.UpdatePackageAsync
+            );
+        }
+
+        private async Task V3_UninstallPackage(HttpContext context)
+        {
+            await HandlePackageActionAsync(
+                context,
+                AutomationPackageApi.UninstallPackageAsync
+            );
+        }
+
+        private async Task HandlePackageActionAsync(
+            HttpContext context,
+            Func<AutomationPackageActionRequest, Task<AutomationPackageOperationResult>> action
+        )
+        {
+            if (!AuthenticateToken(context.Request.Query["token"]))
+            {
+                context.Response.StatusCode = 401;
+                return;
+            }
+
+            string packageId = context.Request.Query["packageId"].ToString();
+            if (string.IsNullOrWhiteSpace(packageId))
+            {
+                context.Response.StatusCode = 400;
+                await context.Response.WriteAsync("The packageId parameter is required.");
+                return;
+            }
+
+            try
+            {
+                var request = new AutomationPackageActionRequest
+                {
+                    PackageId = packageId,
+                    ManagerName = context.Request.Query["manager"],
+                    PackageSource = context.Request.Query["packageSource"],
+                    Version = context.Request.Query["version"],
+                    Scope = context.Request.Query["scope"],
+                    PreRelease = bool.TryParse(context.Request.Query["preRelease"], out bool preRelease)
+                        ? preRelease
+                        : null,
+                };
+
+                await context.Response.WriteAsJsonAsync(
+                    await action(request),
+                    new JsonSerializerOptions(SerializationHelpers.DefaultOptions)
+                    {
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                        WriteIndented = true,
+                    }
+                );
+            }
+            catch (InvalidOperationException ex)
+            {
+                context.Response.StatusCode = 400;
+                await context.Response.WriteAsync(ex.Message);
+            }
         }
 
         private async Task WIDGETS_V1_GetUpdates(HttpContext context)
@@ -159,7 +387,7 @@ namespace UniGetUI.Interface
                     continue;
 
                 string icon =
-                    $"http://localhost:7058/widgets/v2/get_icon_for_package?packageId={Uri.EscapeDataString(package.Id)}&packageSource={Uri.EscapeDataString(package.Source.Name)}&token={ApiTokenHolder.Token}";
+                    $"{_transportOptions.BaseAddressString}/widgets/v2/get_icon_for_package?packageId={Uri.EscapeDataString(package.Id)}&packageSource={Uri.EscapeDataString(package.Source.Name)}&token={ApiTokenHolder.Token}";
                 packages.Append(
                     $"{package.Name.Replace('|', '-')}"
                         + $"|{package.Id}"
@@ -323,6 +551,7 @@ namespace UniGetUI.Interface
             {
                 ArgumentNullException.ThrowIfNull(_host);
                 await _host.StopAsync();
+                BackgroundApiTransportOptions.DeletePersistedMetadata();
                 Logger.Info("Api was shut down");
             }
             catch (Exception ex)

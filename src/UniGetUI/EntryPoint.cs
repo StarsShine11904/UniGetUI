@@ -77,6 +77,11 @@ namespace UniGetUI
                     int ret = CLIHandler.DisableSecureSettingForUser();
                     Environment.Exit(ret);
                 }
+                else if (args.Contains(CLIHandler.AUTOMATION))
+                {
+                    int ret = CLIHandler.Automation();
+                    Environment.Exit(ret);
+                }
                 else
                 {
                     CoreData.WasDaemon = CoreData.IsDaemon = args.Contains(CLIHandler.DAEMON);

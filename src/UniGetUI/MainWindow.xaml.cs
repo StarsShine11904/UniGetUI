@@ -389,6 +389,15 @@ namespace UniGetUI.Interface
                     {
                         /* Skip */
                     }
+                    else if (
+                        param
+                        is BackgroundApiTransportOptions.TransportArgument
+                            or BackgroundApiTransportOptions.TcpPortArgument
+                            or BackgroundApiTransportOptions.NamedPipeArgument
+                    )
+                    {
+                        _ = ParametersToProcess.Count > 0 ? ParametersToProcess.Dequeue() : null;
+                    }
                     else
                     {
                         Logger.Warn("Unknown parameter " + param);

@@ -40,7 +40,7 @@ internal static class AvaloniaBootstrapper
     private static Task InitializeSharedServicesAsync()
     {
         CoreTools.ReloadLanguageEngineInstance();
-        MainWindow.ApplyProxyVariableToProcess();
+        ProcessEnvironmentConfigurator.ApplyProxySettingsToProcess();
         _ = Task.Run(AvaloniaAutoUpdater.UpdateCheckLoopAsync)
             .ContinueWith(
                 t => Logger.Error(t.Exception!),
