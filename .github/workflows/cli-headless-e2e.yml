@@ -59,9 +59,11 @@ jobs:
         working-directory: src
         run: dotnet restore UniGetUI.Avalonia.slnx
 
-      - name: Build Avalonia solution
+      - name: Build headless daemon and CLI
         working-directory: src
-        run: dotnet build UniGetUI.Avalonia.slnx --no-restore --configuration ${{ env.CONFIGURATION }} --verbosity minimal
+        run: |
+          dotnet build UniGetUI.Avalonia/UniGetUI.Avalonia.csproj --no-restore --configuration ${{ env.CONFIGURATION }} --verbosity minimal
+          dotnet build UniGetUI.Cli/UniGetUI.Cli.csproj --no-restore --configuration ${{ env.CONFIGURATION }} --verbosity minimal
 
       - name: Run headless CLI E2E
         shell: pwsh
