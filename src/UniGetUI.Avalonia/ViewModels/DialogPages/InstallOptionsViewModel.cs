@@ -137,9 +137,9 @@ public partial class InstallOptionsViewModel : ObservableObject
     [ObservableProperty] private string _paramsUpdate = "";
     [ObservableProperty] private string _paramsUninstall = "";
 
-    partial void OnParamsInstallChanged(string _) => Refresh();
-    partial void OnParamsUpdateChanged(string _) => Refresh();
-    partial void OnParamsUninstallChanged(string _) => Refresh();
+    partial void OnParamsInstallChanged(string value) => Refresh();
+    partial void OnParamsUpdateChanged(string value) => Refresh();
+    partial void OnParamsUninstallChanged(string value) => Refresh();
 
     // ── Pre/Post commands tab ─────────────────────────────────────────────────
     [ObservableProperty] private string _preInstallText = "";

@@ -91,7 +91,7 @@ public class SourceTreeNode : INotifyPropertyChanged
 public partial class PackagesPageViewModel : ViewModelBase
 {
     public double FilterPaneColumnWidth => IsFilterPaneOpen ? 220.0 : 0.0;
-    partial void OnIsFilterPaneOpenChanged(bool _) => OnPropertyChanged(nameof(FilterPaneColumnWidth));
+    partial void OnIsFilterPaneOpenChanged(bool value) => OnPropertyChanged(nameof(FilterPaneColumnWidth));
 
     // ─── Static config (set once in constructor) ──────────────────────────────
     public readonly string PageName;
