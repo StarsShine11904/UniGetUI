@@ -30,6 +30,10 @@
 | `--automation set-setting --key key (--enabled true|false \| --value text)` | Sets a boolean or string setting through the automation service | 2026.1+ |
 | `--automation clear-setting --key key` | Clears a string-backed setting through the automation service | 2026.1+ |
 | `--automation reset-settings` | Resets non-secure settings while preserving the active automation session token | 2026.1+ |
+| `--automation list-desktop-shortcuts` | Lists tracked desktop shortcuts, their current keep/delete/unknown verdicts, and whether each shortcut still exists on disk | 2026.1+ |
+| `--automation set-desktop-shortcut --path path --status {keep\|delete}` | Marks a tracked shortcut to be kept or deleted; `delete` also removes the shortcut from disk when present | 2026.1+ |
+| `--automation reset-desktop-shortcut --path path` | Clears the stored verdict for one tracked desktop shortcut | 2026.1+ |
+| `--automation reset-desktop-shortcuts` | Clears all stored desktop-shortcut verdicts | 2026.1+ |
 | `--automation get-app-log [--level n]` | Reads the UniGetUI application log as structured JSON, with optional severity filtering | 2026.1+ |
 | `--automation get-operation-history` | Reads the persisted operation history shown by the log/history UI surfaces | 2026.1+ |
 | `--automation get-manager-log [--manager name] [--verbose]` | Reads manager task logs, optionally for one manager and with verbose subprocess/stdin/stdout detail | 2026.1+ |
@@ -65,7 +69,7 @@
 
 - `dotnet src\UniGetUI.Avalonia\bin\Release\net10.0\UniGetUI.Avalonia.dll --headless` starts the local automation daemon without opening any window or requiring a graphical desktop session.
 - `dotnet src\UniGetUI.Cli\bin\Release\net10.0\UniGetUI.Cli.dll <command>` is the cross-platform CLI wrapper for the automation service. It automatically prepends `--automation`, so `UniGetUI.Cli status` and `UniGetUI.Cli search-packages --manager ".NET Tool" --query dotnetsay` work directly.
-- Current agent-oriented command coverage includes status/version, manager/source inspection, settings inspection and mutation, app/history/manager log inspection, package search/details/version listing, ignored-update management, and package install/update/uninstall flows.
+- Current agent-oriented command coverage includes status/version, manager/source inspection, settings inspection and mutation, desktop-shortcut state management, app/history/manager log inspection, package search/details/version listing, ignored-update management, and package install/update/uninstall flows.
 
 <br><br>
 # `unigetui://` deep link

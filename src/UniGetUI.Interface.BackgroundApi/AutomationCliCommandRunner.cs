@@ -113,6 +113,32 @@ public static class AutomationCliCommandRunner
                     output,
                     await client.ResetSettingsAsync()
                 ),
+                "list-desktop-shortcuts" => await WriteJsonAsync(
+                    output,
+                    new
+                    {
+                        status = "success",
+                        shortcuts = await client.ListDesktopShortcutsAsync(),
+                    }
+                ),
+                "set-desktop-shortcut" => await WriteJsonAsync(
+                    output,
+                    await client.SetDesktopShortcutAsync(BuildDesktopShortcutRequest(args, requireStatus: true))
+                ),
+                "reset-desktop-shortcut" => await WriteJsonAsync(
+                    output,
+                    await client.ResetDesktopShortcutAsync(
+                        GetRequiredArgument(
+                            args,
+                            "--path",
+                            "The reset-desktop-shortcut automation command requires --path."
+                        )
+                    )
+                ),
+                "reset-desktop-shortcuts" => await WriteJsonAsync(
+                    output,
+                    await client.ResetDesktopShortcutsAsync()
+                ),
                 "get-app-log" => await WriteJsonAsync(
                     output,
                     new
@@ -322,6 +348,24 @@ public static class AutomationCliCommandRunner
                 "This automation command requires --name."
             ),
             SourceUrl = GetOptionalArgument(args, "--url"),
+        };
+    }
+
+    private static AutomationDesktopShortcutRequest BuildDesktopShortcutRequest(
+        IReadOnlyList<string> args,
+        bool requireStatus
+    )
+    {
+        return new AutomationDesktopShortcutRequest
+        {
+            Path = GetRequiredArgument(args, "--path", "This automation command requires --path."),
+            Status = requireStatus
+                ? GetRequiredArgument(
+                    args,
+                    "--status",
+                    "This automation command requires --status."
+                )
+                : GetOptionalArgument(args, "--status"),
         };
     }
 

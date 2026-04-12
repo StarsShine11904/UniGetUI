@@ -155,6 +155,44 @@ public sealed class BackgroundApiClient : IDisposable
             };
     }
 
+    public async Task<IReadOnlyList<AutomationDesktopShortcutInfo>> ListDesktopShortcutsAsync()
+    {
+        return await ReadAuthenticatedJsonAsync<IReadOnlyList<AutomationDesktopShortcutInfo>>(
+            HttpMethod.Get,
+            "/v3/desktop-shortcuts"
+        ) ?? [];
+    }
+
+    public async Task<AutomationDesktopShortcutOperationResult> SetDesktopShortcutAsync(
+        AutomationDesktopShortcutRequest request
+    )
+    {
+        return await SendDesktopShortcutOperationAsync("/v3/desktop-shortcuts/set", request);
+    }
+
+    public async Task<AutomationDesktopShortcutOperationResult> ResetDesktopShortcutAsync(
+        string shortcutPath
+    )
+    {
+        return await SendDesktopShortcutOperationAsync(
+            "/v3/desktop-shortcuts/reset",
+            new AutomationDesktopShortcutRequest { Path = shortcutPath }
+        );
+    }
+
+    public async Task<BackgroundApiCommandResult> ResetDesktopShortcutsAsync()
+    {
+        return await ReadAuthenticatedJsonAsync<BackgroundApiCommandResult>(
+                HttpMethod.Post,
+                "/v3/desktop-shortcuts/reset-all"
+            )
+            ?? new BackgroundApiCommandResult
+            {
+                Status = "error",
+                Message = "The background API returned an empty response.",
+            };
+    }
+
     public async Task<IReadOnlyList<AutomationAppLogEntry>> GetAppLogAsync(int level = 4)
     {
         return await ReadAuthenticatedJsonAsync<IReadOnlyList<AutomationAppLogEntry>>(
@@ -535,6 +573,29 @@ public sealed class BackgroundApiClient : IDisposable
             };
     }
 
+    private async Task<AutomationDesktopShortcutOperationResult> SendDesktopShortcutOperationAsync(
+        string relativePath,
+        AutomationDesktopShortcutRequest request
+    )
+    {
+        Dictionary<string, string> parameters = new() { ["path"] = request.Path };
+        if (!string.IsNullOrWhiteSpace(request.Status))
+        {
+            parameters["status"] = request.Status;
+        }
+
+        return await ReadAuthenticatedJsonAsync<AutomationDesktopShortcutOperationResult>(
+                HttpMethod.Post,
+                relativePath,
+                parameters
+            )
+            ?? new AutomationDesktopShortcutOperationResult
+            {
+                Status = "error",
+                Message = "The background API returned an empty response.",
+            };
+    }
+
     private async Task<BackgroundApiCommandResult> SendCommandAsync(
         string relativePath,
         IReadOnlyDictionary<string, string>? queryParameters = null
@@ -644,6 +705,7 @@ public sealed class BackgroundApiClient : IDisposable
         if (
             relativePath.StartsWith("/v3/managers", StringComparison.OrdinalIgnoreCase)
             || relativePath.StartsWith("/v3/settings", StringComparison.OrdinalIgnoreCase)
+            || relativePath.StartsWith("/v3/desktop-shortcuts", StringComparison.OrdinalIgnoreCase)
             || relativePath.StartsWith("/v3/logs/", StringComparison.OrdinalIgnoreCase)
         )
         {

@@ -77,6 +77,10 @@ namespace UniGetUI.Interface
                         endpoints.MapPost("/v3/settings/set", V3_SetSetting);
                         endpoints.MapPost("/v3/settings/clear", V3_ClearSetting);
                         endpoints.MapPost("/v3/settings/reset", V3_ResetSettings);
+                        endpoints.MapGet("/v3/desktop-shortcuts", V3_ListDesktopShortcuts);
+                        endpoints.MapPost("/v3/desktop-shortcuts/set", V3_SetDesktopShortcut);
+                        endpoints.MapPost("/v3/desktop-shortcuts/reset", V3_ResetDesktopShortcut);
+                        endpoints.MapPost("/v3/desktop-shortcuts/reset-all", V3_ResetDesktopShortcuts);
                         endpoints.MapGet("/v3/logs/app", V3_GetAppLog);
                         endpoints.MapGet("/v3/logs/history", V3_GetOperationHistory);
                         endpoints.MapGet("/v3/logs/manager", V3_GetManagerLog);
@@ -384,6 +388,107 @@ namespace UniGetUI.Interface
             AutomationManagerSettingsApi.ResetSettingsPreservingSession();
             await context.Response.WriteAsJsonAsync(
                 BackgroundApiCommandResult.Success("reset-settings"),
+                new JsonSerializerOptions(SerializationHelpers.DefaultOptions)
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    WriteIndented = true,
+                }
+            );
+        }
+
+        private async Task V3_ListDesktopShortcuts(HttpContext context)
+        {
+            if (!AuthenticateToken(context.Request.Query["token"]))
+            {
+                context.Response.StatusCode = 401;
+                return;
+            }
+
+            await context.Response.WriteAsJsonAsync(
+                AutomationDesktopShortcutsApi.ListShortcuts(),
+                new JsonSerializerOptions(SerializationHelpers.DefaultOptions)
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    WriteIndented = true,
+                }
+            );
+        }
+
+        private async Task V3_SetDesktopShortcut(HttpContext context)
+        {
+            if (!AuthenticateToken(context.Request.Query["token"]))
+            {
+                context.Response.StatusCode = 401;
+                return;
+            }
+
+            try
+            {
+                await context.Response.WriteAsJsonAsync(
+                    AutomationDesktopShortcutsApi.SetShortcut(
+                        new AutomationDesktopShortcutRequest
+                        {
+                            Path = context.Request.Query["path"],
+                            Status = context.Request.Query.TryGetValue("status", out var status)
+                                ? status.ToString()
+                                : null,
+                        }
+                    ),
+                    new JsonSerializerOptions(SerializationHelpers.DefaultOptions)
+                    {
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                        WriteIndented = true,
+                    }
+                );
+            }
+            catch (InvalidOperationException ex)
+            {
+                context.Response.StatusCode = 400;
+                await context.Response.WriteAsync(ex.Message);
+            }
+        }
+
+        private async Task V3_ResetDesktopShortcut(HttpContext context)
+        {
+            if (!AuthenticateToken(context.Request.Query["token"]))
+            {
+                context.Response.StatusCode = 401;
+                return;
+            }
+
+            try
+            {
+                await context.Response.WriteAsJsonAsync(
+                    AutomationDesktopShortcutsApi.ResetShortcut(
+                        new AutomationDesktopShortcutRequest
+                        {
+                            Path = context.Request.Query["path"],
+                        }
+                    ),
+                    new JsonSerializerOptions(SerializationHelpers.DefaultOptions)
+                    {
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                        WriteIndented = true,
+                    }
+                );
+            }
+            catch (InvalidOperationException ex)
+            {
+                context.Response.StatusCode = 400;
+                await context.Response.WriteAsync(ex.Message);
+            }
+        }
+
+        private async Task V3_ResetDesktopShortcuts(HttpContext context)
+        {
+            if (!AuthenticateToken(context.Request.Query["token"]))
+            {
+                context.Response.StatusCode = 401;
+                return;
+            }
+
+            await context.Response.WriteAsJsonAsync(
+                AutomationDesktopShortcutsApi.ResetAllShortcuts(),
                 new JsonSerializerOptions(SerializationHelpers.DefaultOptions)
                 {
                     PropertyNamingPolicy = JsonNamingPolicy.CamelCase,

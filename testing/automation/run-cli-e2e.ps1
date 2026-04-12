@@ -146,6 +146,47 @@ try {
         throw "list-settings did not report FreshValue"
     }
 
+    $syntheticShortcut = Join-Path $daemonRoot 'SyntheticShortcut.lnk'
+    New-Item -ItemType File -Path $syntheticShortcut | Out-Null
+
+    $keepShortcut = Invoke-CliJson -Arguments @('set-desktop-shortcut', '--path', $syntheticShortcut, '--status', 'keep')
+    if ($keepShortcut.shortcut.status -ne 'keep') {
+        throw "set-desktop-shortcut did not persist the keep verdict"
+    }
+
+    $shortcuts = Invoke-CliJson -Arguments @('list-desktop-shortcuts')
+    if (@($shortcuts.shortcuts | Where-Object { $_.path -eq $syntheticShortcut -and $_.status -eq 'keep' -and $_.existsOnDisk }).Count -eq 0) {
+        throw "list-desktop-shortcuts did not report the kept synthetic shortcut"
+    }
+
+    $deleteShortcut = Invoke-CliJson -Arguments @('set-desktop-shortcut', '--path', $syntheticShortcut, '--status', 'delete')
+    if ($deleteShortcut.shortcut.status -ne 'delete') {
+        throw "set-desktop-shortcut did not persist the delete verdict"
+    }
+    if (Test-Path $syntheticShortcut) {
+        throw "set-desktop-shortcut --status delete did not delete the synthetic shortcut from disk"
+    }
+
+    $shortcutsAfterDelete = Invoke-CliJson -Arguments @('list-desktop-shortcuts')
+    if (@($shortcutsAfterDelete.shortcuts | Where-Object { $_.path -eq $syntheticShortcut -and $_.status -eq 'delete' -and -not $_.existsOnDisk }).Count -eq 0) {
+        throw "list-desktop-shortcuts did not report the deleted synthetic shortcut"
+    }
+
+    $resetShortcut = Invoke-CliJson -Arguments @('reset-desktop-shortcut', '--path', $syntheticShortcut)
+    if ($resetShortcut.shortcut.status -ne 'unknown') {
+        throw "reset-desktop-shortcut did not clear the verdict"
+    }
+
+    $shortcutsAfterReset = Invoke-CliJson -Arguments @('list-desktop-shortcuts')
+    if (@($shortcutsAfterReset.shortcuts | Where-Object { $_.path -eq $syntheticShortcut }).Count -ne 0) {
+        throw "reset-desktop-shortcut did not remove the synthetic shortcut from the tracked list"
+    }
+
+    $resetAllShortcuts = Invoke-CliJson -Arguments @('reset-desktop-shortcuts')
+    if ($resetAllShortcuts.status -ne 'success') {
+        throw "reset-desktop-shortcuts failed: $($resetAllShortcuts | ConvertTo-Json -Depth 8)"
+    }
+
     $appLog = Invoke-CliJson -Arguments @('get-app-log', '--level', '5')
     if (@($appLog.entries).Count -eq 0) {
         throw "get-app-log returned no entries"
