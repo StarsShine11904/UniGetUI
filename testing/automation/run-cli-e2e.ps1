@@ -164,6 +164,10 @@ try {
     if ($searchMatch.Count -eq 0) {
         throw "search-packages did not return dotnetsay"
     }
+    $latestDotnetsayVersion = $searchMatch[0].version
+    if ([string]::IsNullOrWhiteSpace($latestDotnetsayVersion)) {
+        throw "search-packages did not report the latest dotnetsay version"
+    }
 
     $details = Invoke-CliJson -Arguments @('package-details', '--manager', '.NET Tool', '--package-id', 'dotnetsay')
     if ($details.package.id -ne 'dotnetsay') {
@@ -218,7 +222,7 @@ try {
         throw "unignore-package did not remove dotnetsay from ignored updates"
     }
 
-    $update = Invoke-CliJson -Arguments @('update-package', '--manager', '.NET Tool', '--package-id', 'dotnetsay')
+    $update = Invoke-CliJson -Arguments @('update-package', '--manager', '.NET Tool', '--package-id', 'dotnetsay', '--version', $latestDotnetsayVersion)
     if ($update.status -ne 'success') {
         throw "update-package failed: $($update | ConvertTo-Json -Depth 8)"
     }
@@ -228,7 +232,7 @@ try {
         -FailureMessage 'list-installed did not include an updated dotnetsay version after update' `
         -Condition {
             param($response)
-            @($response.packages | Where-Object { $_.id -eq 'dotnetsay' -and $_.version -ne '2.1.4' }).Count -gt 0
+            @($response.packages | Where-Object { $_.id -eq 'dotnetsay' -and $_.version -eq $latestDotnetsayVersion }).Count -gt 0
         }
     $updatedDotnetsay = @($installedAfterUpdate.packages | Where-Object { $_.id -eq 'dotnetsay' })
 

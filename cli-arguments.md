@@ -43,7 +43,7 @@
 | `--automation unignore-package --manager name --package-id id [--version v]` | Removes an ignored-update rule for a package and refreshes the updates view | 2026.1+ |
 | `--automation update-all` | Queues updates for all packages currently shown as upgradable | 2026.1+ |
 | `--automation update-manager --manager name` | Queues updates for all packages handled by the specified manager | 2026.1+ |
-| `--automation update-package --manager name --package-id id` | Updates a specific package through the automation service and waits for completion | 2026.1+ |
+| `--automation update-package --manager name --package-id id [--version v]` | Updates a specific package through the automation service and waits for completion | 2026.1+ |
 | `--automation uninstall-package --manager name --package-id id [--scope scope]` | Uninstalls a package through the automation service and waits for completion | 2026.1+ |
 | `--background-api-transport {tcp\|named-pipe}` | Selects which local HTTP transport UniGetUI uses for the background API when the app starts | 2026.1+ |
 | `--background-api-port port` | Overrides the localhost TCP port used by the background API when `--background-api-transport tcp` is active | 2026.1+ |
