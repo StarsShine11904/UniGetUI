@@ -29,6 +29,8 @@ New-Item -ItemType Directory -Path $daemonRoot | Out-Null
 $env:HOME = $daemonRoot
 $env:USERPROFILE = $daemonRoot
 $env:DOTNET_CLI_HOME = $daemonRoot
+$env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE = '1'
+$env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
 
 $transportArgs = @()
 $daemonArgs = @('run', '--project', $daemonProject, '--configuration', $configuration, '--no-build', '--', '--headless')
@@ -144,6 +146,14 @@ try {
         throw "list-settings did not report FreshValue"
     }
 
+    $appLog = Invoke-CliJson -Arguments @('get-app-log', '--level', '5')
+    if (@($appLog.entries).Count -eq 0) {
+        throw "get-app-log returned no entries"
+    }
+    if (@($appLog.entries | Where-Object { -not [string]::IsNullOrWhiteSpace($_.content) }).Count -eq 0) {
+        throw "get-app-log did not return readable log content"
+    }
+
     $setFreshValue = Invoke-CliJson -Arguments @('set-setting', '--key', 'FreshValue', '--value', 'cli-smoke')
     if ($setFreshValue.setting.stringValue -ne 'cli-smoke') {
         throw "set-setting did not persist FreshValue"
@@ -249,6 +259,36 @@ try {
             @($response.packages | Where-Object { $_.id -eq 'dotnetsay' }).Count -eq 0
         }
     $remainingDotnetsay = @($installedAfterUninstall.packages | Where-Object { $_.id -eq 'dotnetsay' })
+
+    $operationHistory = Invoke-CliJson -Arguments @('get-operation-history')
+    if ($null -eq $operationHistory.history) {
+        throw "get-operation-history did not return a history payload"
+    }
+    if (
+        @($operationHistory.history).Count -gt 0 -and
+        @($operationHistory.history | Where-Object { -not [string]::IsNullOrWhiteSpace($_.content) }).Count -eq 0
+    ) {
+        throw "get-operation-history returned entries without readable content"
+    }
+
+    $managerLog = Wait-ForCliCondition `
+        -Arguments @('get-manager-log', '--manager', '.NET Tool', '--verbose') `
+        -FailureMessage 'get-manager-log did not capture .NET Tool task output for dotnetsay' `
+        -Condition {
+            param($response)
+            @(
+                $response.managers |
+                    Where-Object {
+                        $_.displayName -eq '.NET Tool' -and
+                        @(
+                            $_.tasks |
+                                Where-Object {
+                                    @($_.lines | Where-Object { $_ -match 'dotnetsay' }).Count -gt 0
+                                }
+                        ).Count -gt 0
+                    }
+            ).Count -gt 0
+        }
 
     $clearFreshValue = Invoke-CliJson -Arguments @('clear-setting', '--key', 'FreshValue')
     if ($clearFreshValue.setting.isSet) {

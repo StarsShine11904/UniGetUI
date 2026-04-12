@@ -77,6 +77,9 @@ namespace UniGetUI.Interface
                         endpoints.MapPost("/v3/settings/set", V3_SetSetting);
                         endpoints.MapPost("/v3/settings/clear", V3_ClearSetting);
                         endpoints.MapPost("/v3/settings/reset", V3_ResetSettings);
+                        endpoints.MapGet("/v3/logs/app", V3_GetAppLog);
+                        endpoints.MapGet("/v3/logs/history", V3_GetOperationHistory);
+                        endpoints.MapGet("/v3/logs/manager", V3_GetManagerLog);
                         endpoints.MapGet("/v3/packages/search", V3_SearchPackages);
                         endpoints.MapGet("/v3/packages/installed", V3_ListInstalledPackages);
                         endpoints.MapGet("/v3/packages/updates", V3_ListUpgradablePackages);
@@ -387,6 +390,74 @@ namespace UniGetUI.Interface
                     WriteIndented = true,
                 }
             );
+        }
+
+        private async Task V3_GetAppLog(HttpContext context)
+        {
+            if (!AuthenticateToken(context.Request.Query["token"]))
+            {
+                context.Response.StatusCode = 401;
+                return;
+            }
+
+            int level = int.TryParse(context.Request.Query["level"], out int parsedLevel)
+                ? parsedLevel
+                : 4;
+            await context.Response.WriteAsJsonAsync(
+                AutomationLogsApi.ListAppLog(level),
+                new JsonSerializerOptions(SerializationHelpers.DefaultOptions)
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    WriteIndented = true,
+                }
+            );
+        }
+
+        private async Task V3_GetOperationHistory(HttpContext context)
+        {
+            if (!AuthenticateToken(context.Request.Query["token"]))
+            {
+                context.Response.StatusCode = 401;
+                return;
+            }
+
+            await context.Response.WriteAsJsonAsync(
+                AutomationLogsApi.ListOperationHistory(),
+                new JsonSerializerOptions(SerializationHelpers.DefaultOptions)
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    WriteIndented = true,
+                }
+            );
+        }
+
+        private async Task V3_GetManagerLog(HttpContext context)
+        {
+            if (!AuthenticateToken(context.Request.Query["token"]))
+            {
+                context.Response.StatusCode = 401;
+                return;
+            }
+
+            try
+            {
+                await context.Response.WriteAsJsonAsync(
+                    AutomationLogsApi.ListManagerLogs(
+                        context.Request.Query["manager"],
+                        bool.TryParse(context.Request.Query["verbose"], out bool verbose) && verbose
+                    ),
+                    new JsonSerializerOptions(SerializationHelpers.DefaultOptions)
+                    {
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                        WriteIndented = true,
+                    }
+                );
+            }
+            catch (InvalidOperationException ex)
+            {
+                context.Response.StatusCode = 400;
+                await context.Response.WriteAsync(ex.Message);
+            }
         }
 
         private async Task WIDGETS_V1_GetUniGetUIVersion(HttpContext context)

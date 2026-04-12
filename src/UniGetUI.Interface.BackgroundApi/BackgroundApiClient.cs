@@ -155,6 +155,50 @@ public sealed class BackgroundApiClient : IDisposable
             };
     }
 
+    public async Task<IReadOnlyList<AutomationAppLogEntry>> GetAppLogAsync(int level = 4)
+    {
+        return await ReadAuthenticatedJsonAsync<IReadOnlyList<AutomationAppLogEntry>>(
+            HttpMethod.Get,
+            "/v3/logs/app",
+            new Dictionary<string, string> { ["level"] = level.ToString() }
+        ) ?? [];
+    }
+
+    public async Task<IReadOnlyList<AutomationOperationHistoryEntry>> GetOperationHistoryAsync()
+    {
+        return await ReadAuthenticatedJsonAsync<IReadOnlyList<AutomationOperationHistoryEntry>>(
+            HttpMethod.Get,
+            "/v3/logs/history"
+        ) ?? [];
+    }
+
+    public async Task<IReadOnlyList<AutomationManagerLogInfo>> GetManagerLogAsync(
+        string? managerName = null,
+        bool verbose = false
+    )
+    {
+        Dictionary<string, string>? parameters = null;
+        if (!string.IsNullOrWhiteSpace(managerName) || verbose)
+        {
+            parameters = new Dictionary<string, string>();
+            if (!string.IsNullOrWhiteSpace(managerName))
+            {
+                parameters["manager"] = managerName;
+            }
+
+            if (verbose)
+            {
+                parameters["verbose"] = "true";
+            }
+        }
+
+        return await ReadAuthenticatedJsonAsync<IReadOnlyList<AutomationManagerLogInfo>>(
+            HttpMethod.Get,
+            "/v3/logs/manager",
+            parameters
+        ) ?? [];
+    }
+
     public async Task<BackgroundApiCommandResult> OpenWindowAsync()
     {
         await SendAuthenticatedGetAsync("/widgets/v1/open_wingetui");
@@ -600,6 +644,7 @@ public sealed class BackgroundApiClient : IDisposable
         if (
             relativePath.StartsWith("/v3/managers", StringComparison.OrdinalIgnoreCase)
             || relativePath.StartsWith("/v3/settings", StringComparison.OrdinalIgnoreCase)
+            || relativePath.StartsWith("/v3/logs/", StringComparison.OrdinalIgnoreCase)
         )
         {
             return TimeSpan.FromSeconds(15);

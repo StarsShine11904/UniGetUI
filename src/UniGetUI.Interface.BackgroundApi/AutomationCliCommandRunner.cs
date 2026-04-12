@@ -113,6 +113,33 @@ public static class AutomationCliCommandRunner
                     output,
                     await client.ResetSettingsAsync()
                 ),
+                "get-app-log" => await WriteJsonAsync(
+                    output,
+                    new
+                    {
+                        status = "success",
+                        entries = await client.GetAppLogAsync(GetOptionalIntArgument(args, "--level") ?? 4),
+                    }
+                ),
+                "get-operation-history" => await WriteJsonAsync(
+                    output,
+                    new
+                    {
+                        status = "success",
+                        history = await client.GetOperationHistoryAsync(),
+                    }
+                ),
+                "get-manager-log" => await WriteJsonAsync(
+                    output,
+                    new
+                    {
+                        status = "success",
+                        managers = await client.GetManagerLogAsync(
+                            GetOptionalArgument(args, "--manager"),
+                            args.Contains("--verbose")
+                        ),
+                    }
+                ),
                 "get-version" => await WriteJsonAsync(
                     output,
                     new
