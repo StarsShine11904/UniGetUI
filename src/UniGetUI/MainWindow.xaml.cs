@@ -41,6 +41,7 @@ namespace UniGetUI.Interface
         private bool HasLoadedLastGeometry;
 
         public MainView NavigationPage = null!;
+        public bool IsInterfaceVisible => MainContentFrame.Content is not null;
         public bool BlockLoading;
         private string _currentSubtitle = "";
         private int _currentSubtitlePxLength;
@@ -707,6 +708,12 @@ namespace UniGetUI.Interface
             };
 
             SetMinimizable(true);
+        }
+
+        public void ShowFromTray()
+        {
+            AppWindow.Show();
+            Activate();
         }
 
         public void ApplyTheme()

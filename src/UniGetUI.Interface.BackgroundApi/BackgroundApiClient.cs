@@ -63,6 +63,57 @@ public sealed class BackgroundApiClient : IDisposable
         };
     }
 
+    public async Task<AutomationAppInfo> GetAppInfoAsync()
+    {
+        return await ReadAuthenticatedJsonAsync<AutomationAppInfo>(HttpMethod.Get, "/v3/app")
+            ?? new AutomationAppInfo();
+    }
+
+    public async Task<BackgroundApiCommandResult> ShowAppAsync()
+    {
+        return await ReadAuthenticatedJsonAsync<BackgroundApiCommandResult>(
+                HttpMethod.Post,
+                "/v3/app/show"
+            )
+            ?? new BackgroundApiCommandResult
+            {
+                Status = "error",
+                Command = "show-app",
+                Message = "The background API returned an empty response.",
+            };
+    }
+
+    public async Task<BackgroundApiCommandResult> NavigateAppAsync(
+        AutomationAppNavigateRequest request
+    )
+    {
+        return await ReadAuthenticatedJsonAsync<BackgroundApiCommandResult>(
+                HttpMethod.Post,
+                "/v3/app/navigate",
+                BuildAppNavigateParameters(request)
+            )
+            ?? new BackgroundApiCommandResult
+            {
+                Status = "error",
+                Command = "navigate-app",
+                Message = "The background API returned an empty response.",
+            };
+    }
+
+    public async Task<BackgroundApiCommandResult> QuitAppAsync()
+    {
+        return await ReadAuthenticatedJsonAsync<BackgroundApiCommandResult>(
+                HttpMethod.Post,
+                "/v3/app/quit"
+            )
+            ?? new BackgroundApiCommandResult
+            {
+                Status = "error",
+                Command = "quit-app",
+                Message = "The background API returned an empty response.",
+            };
+    }
+
     public async Task<IReadOnlyList<AutomationManagerInfo>> ListManagersAsync()
     {
         return await ReadAuthenticatedJsonAsync<IReadOnlyList<AutomationManagerInfo>>(
@@ -577,14 +628,17 @@ public sealed class BackgroundApiClient : IDisposable
 
     public async Task<BackgroundApiCommandResult> OpenWindowAsync()
     {
-        await SendAuthenticatedGetAsync("/widgets/v1/open_wingetui");
-        return BackgroundApiCommandResult.Success("open-window");
+        return await ShowAppAsync();
     }
 
     public async Task<BackgroundApiCommandResult> OpenUpdatesAsync()
     {
-        await SendAuthenticatedGetAsync("/widgets/v1/view_on_wingetui");
-        return BackgroundApiCommandResult.Success("open-updates");
+        return await NavigateAppAsync(
+            new AutomationAppNavigateRequest
+            {
+                Page = "updates",
+            }
+        );
     }
 
     public async Task<BackgroundApiCommandResult> ShowPackageAsync(
@@ -1083,6 +1137,28 @@ public sealed class BackgroundApiClient : IDisposable
         if (!string.IsNullOrWhiteSpace(request.OutputPath))
         {
             parameters["outputPath"] = request.OutputPath;
+        }
+
+        return parameters;
+    }
+
+    private static Dictionary<string, string> BuildAppNavigateParameters(
+        AutomationAppNavigateRequest request
+    )
+    {
+        Dictionary<string, string> parameters = new()
+        {
+            ["page"] = AutomationAppPages.NormalizePageName(request.Page),
+        };
+
+        if (!string.IsNullOrWhiteSpace(request.ManagerName))
+        {
+            parameters["manager"] = request.ManagerName;
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.HelpAttachment))
+        {
+            parameters["helpAttachment"] = request.HelpAttachment;
         }
 
         return parameters;

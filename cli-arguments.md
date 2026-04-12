@@ -19,6 +19,10 @@
 | `--[enable\|disable]-secure-setting key` | Enables/disables the given secure setting<sup>2</sup> for current user. This will generate a UAC prompt  | 3.2.1+ | 
 | `--headless` | Starts the Avalonia host as a pure automation daemon with **no UI** and no requirement for a working graphical environment. Compatible with `--background-api-*` transport arguments. | 2026.1+ |
 | `--automation status` | Queries the local automation service and returns machine-readable status, including the configured background API transport | 2026.1+ |
+| `--automation get-app-state` | Returns app/session automation state including headless mode, current page when a window exists, and which app-level actions are supported by the current host | 2026.1+ |
+| `--automation show-app` | Asks the running UniGetUI instance to show and focus its main window when a UI session exists | 2026.1+ |
+| `--automation navigate-app --page {discover\|updates\|installed\|bundles\|settings\|managers\|own-log\|manager-log\|operation-history\|help\|release-notes\|about} [--manager name] [--help-attachment path]` | Navigates the running UI session to a top-level destination, with optional manager-specific or help-page context where supported | 2026.1+ |
+| `--automation quit-app` | Gracefully shuts down the current UniGetUI session, including the headless automation daemon | 2026.1+ |
 | `--automation get-version` | Reads the local automation service build number through the background API | 2026.1+ |
 | `--automation get-updates` | Reads the currently available updates through the local automation service and returns structured JSON | 2026.1+ |
 | `--automation list-managers` | Lists package managers, readiness, executable metadata, and automation-relevant capability flags | 2026.1+ |
@@ -70,8 +74,8 @@
 | `--automation install-package --manager name --package-id id [--version v] [--scope scope] [--pre-release] [--elevated true\|false] [--interactive true\|false] [--skip-hash true\|false] [--architecture value] [--location path]` | Installs a package through the automation service and waits for completion, honoring the same core install options exposed by the UI | 2026.1+ |
 | `--automation download-package --manager name --package-id id --output path` | Downloads a package installer or artifact to the specified file or directory and returns the resolved saved path | 2026.1+ |
 | `--automation reinstall-package --manager name --package-id id [--version v] [--scope scope] [--pre-release] [--elevated true\|false] [--interactive true\|false] [--skip-hash true\|false] [--architecture value] [--location path]` | Re-runs package installation for an installed package using the requested install options | 2026.1+ |
-| `--automation open-window` | Asks the running UniGetUI instance to show the main window | 2026.1+ |
-| `--automation open-updates` | Asks the running UniGetUI instance to show the Updates page | 2026.1+ |
+| `--automation open-window` | Legacy alias for `--automation show-app` | 2026.1+ |
+| `--automation open-updates` | Legacy alias for `--automation navigate-app --page updates` | 2026.1+ |
 | `--automation show-package --package-id id --package-source source` | Opens the package details flow for the specified package | 2026.1+ |
 | `--automation list-ignored-updates` | Lists ignored update rules tracked by UniGetUI | 2026.1+ |
 | `--automation ignore-package --manager name --package-id id [--version v]` | Adds an ignored-update rule for a package and refreshes the updates view | 2026.1+ |
@@ -98,7 +102,7 @@
 
 - `dotnet src\UniGetUI.Avalonia\bin\Release\net10.0\UniGetUI.Avalonia.dll --headless` starts the local automation daemon without opening any window or requiring a graphical desktop session.
 - `dotnet src\UniGetUI.Cli\bin\Release\net10.0\UniGetUI.Cli.dll <command>` is the cross-platform CLI wrapper for the automation service. It automatically prepends `--automation`, so `UniGetUI.Cli status` and `UniGetUI.Cli search-packages --manager ".NET Tool" --query dotnetsay` work directly.
-- Current agent-oriented command coverage includes status/version, manager/source inspection plus manager enablement, notification suppression, manager-maintenance and executable-path control, settings and secure-settings inspection/mutation, desktop-shortcut state management, app/history/manager log inspection, local backup creation and GitHub cloud-backup/auth flows, current bundle inspection/import/export/add/remove/install flows, package search/details/version listing, ignored-update management, and package install/update/uninstall flows.
+- Current agent-oriented command coverage includes app/session lifecycle inspection and shutdown, manager/source inspection plus manager enablement, notification suppression, manager-maintenance and executable-path control, settings and secure-settings inspection/mutation, desktop-shortcut state management, app/history/manager log inspection, local backup creation and GitHub cloud-backup/auth flows, current bundle inspection/import/export/add/remove/install flows, package search/details/version listing, ignored-update management, and package install/update/uninstall flows.
 
 <br><br>
 # `unigetui://` deep link

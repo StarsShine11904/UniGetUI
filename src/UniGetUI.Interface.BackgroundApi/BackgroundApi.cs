@@ -31,6 +31,10 @@ namespace UniGetUI.Interface
         public event EventHandler<EventArgs>? OnUpgradeAll;
         public event EventHandler<string>? OnUpgradeAllForManager;
         public event EventHandler<string>? OnUpgradePackage;
+        public Func<AutomationAppInfo>? AppInfoProvider;
+        public Func<BackgroundApiCommandResult>? ShowAppHandler;
+        public Func<AutomationAppNavigateRequest, BackgroundApiCommandResult>? NavigateAppHandler;
+        public Func<BackgroundApiCommandResult>? QuitAppHandler;
 
         private IHost? _host;
         private BackgroundApiTransportOptions _transportOptions =
@@ -68,6 +72,10 @@ namespace UniGetUI.Interface
                     app.UseEndpoints(endpoints =>
                     {
                         endpoints.MapGet("/v3/status", V3_Status);
+                        endpoints.MapGet("/v3/app", V3_GetAppInfo);
+                        endpoints.MapPost("/v3/app/show", V3_ShowApp);
+                        endpoints.MapPost("/v3/app/navigate", V3_NavigateApp);
+                        endpoints.MapPost("/v3/app/quit", V3_QuitApp);
                         endpoints.MapGet("/v3/managers", V3_ListManagers);
                         endpoints.MapGet("/v3/managers/maintenance", V3_GetManagerMaintenance);
                         endpoints.MapPost("/v3/managers/maintenance/reload", V3_ReloadManager);
@@ -262,6 +270,71 @@ namespace UniGetUI.Interface
                     PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
                     WriteIndented = true,
                 }
+            );
+        }
+
+        private async Task V3_GetAppInfo(HttpContext context)
+        {
+            if (!AuthenticateToken(context.Request.Query["token"]))
+            {
+                context.Response.StatusCode = 401;
+                return;
+            }
+
+            try
+            {
+                await context.Response.WriteAsJsonAsync(
+                    AppInfoProvider?.Invoke()
+                        ?? throw new InvalidOperationException(
+                            "The application did not register an app-state provider."
+                        ),
+                    new JsonSerializerOptions(SerializationHelpers.DefaultOptions)
+                    {
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                        WriteIndented = true,
+                    }
+                );
+            }
+            catch (InvalidOperationException ex)
+            {
+                context.Response.StatusCode = 400;
+                await context.Response.WriteAsync(ex.Message);
+            }
+        }
+
+        private async Task V3_ShowApp(HttpContext context)
+        {
+            await HandleCommandAsync(
+                context,
+                () =>
+                    ShowAppHandler?.Invoke()
+                    ?? throw new InvalidOperationException(
+                        "The current UniGetUI session cannot show a window."
+                    )
+            );
+        }
+
+        private async Task V3_NavigateApp(HttpContext context)
+        {
+            await HandleCommandAsync(
+                context,
+                () =>
+                    NavigateAppHandler?.Invoke(BuildAppNavigateRequest(context.Request))
+                    ?? throw new InvalidOperationException(
+                        "The current UniGetUI session cannot navigate application pages."
+                    )
+            );
+        }
+
+        private async Task V3_QuitApp(HttpContext context)
+        {
+            await HandleCommandAsync(
+                context,
+                () =>
+                    QuitAppHandler?.Invoke()
+                    ?? throw new InvalidOperationException(
+                        "The current UniGetUI session cannot be shut down through automation."
+                    )
             );
         }
 
@@ -1393,6 +1466,35 @@ namespace UniGetUI.Interface
             }
         }
 
+        private static async Task HandleCommandAsync(
+            HttpContext context,
+            Func<BackgroundApiCommandResult> action
+        )
+        {
+            if (!AuthenticateToken(context.Request.Query["token"]))
+            {
+                context.Response.StatusCode = 401;
+                return;
+            }
+
+            try
+            {
+                await context.Response.WriteAsJsonAsync(
+                    action(),
+                    new JsonSerializerOptions(SerializationHelpers.DefaultOptions)
+                    {
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                        WriteIndented = true,
+                    }
+                );
+            }
+            catch (InvalidOperationException ex)
+            {
+                context.Response.StatusCode = 400;
+                await context.Response.WriteAsync(ex.Message);
+            }
+        }
+
         private static async Task HandleCommandActionAsync(
             HttpContext context,
             Func<AutomationPackageActionRequest, Task<BackgroundApiCommandResult>> action
@@ -1595,6 +1697,20 @@ namespace UniGetUI.Interface
                 Architecture = request.Query["architecture"],
                 InstallLocation = request.Query["location"],
                 OutputPath = request.Query["outputPath"],
+            };
+        }
+
+        private static AutomationAppNavigateRequest BuildAppNavigateRequest(HttpRequest request)
+        {
+            return new AutomationAppNavigateRequest
+            {
+                Page = request.Query["page"],
+                ManagerName = request.Query.TryGetValue("manager", out var manager)
+                    ? manager.ToString()
+                    : null,
+                HelpAttachment = request.Query.TryGetValue("helpAttachment", out var helpAttachment)
+                    ? helpAttachment.ToString()
+                    : null,
             };
         }
 

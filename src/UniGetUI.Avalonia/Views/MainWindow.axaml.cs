@@ -9,6 +9,7 @@ using UniGetUI.Avalonia.Views.Pages;
 using UniGetUI.Core.Logging;
 using UniGetUI.Core.SettingsEngine;
 using UniGetUI.Core.Tools;
+using UniGetUI.PackageEngine.Interfaces;
 
 namespace UniGetUI.Avalonia.Views;
 
@@ -42,6 +43,7 @@ public partial class MainWindow : Window
     public static MainWindow? Instance { get; private set; }
 
     private MainWindowViewModel ViewModel => (MainWindowViewModel)DataContext!;
+    public PageType CurrentPage => ViewModel.CurrentPage_t;
 
     public MainWindow()
     {
@@ -148,6 +150,10 @@ public partial class MainWindow : Window
 
     // ─── Public navigation API ────────────────────────────────────────────────
     public void Navigate(PageType type) => ViewModel.NavigateTo(type);
+    public void OpenManagerLogs(IPackageManager? manager = null) => ViewModel.OpenManagerLogs(manager);
+    public void OpenManagerSettings(IPackageManager? manager = null) =>
+        ViewModel.OpenManagerSettings(manager);
+    public void ShowHelp(string uriAttachment = "") => ViewModel.ShowHelp(uriAttachment);
 
     // ─── Public API (legacy compat) ───────────────────────────────────────────
     public void ShowBanner(string title, string message, RuntimeNotificationLevel level)

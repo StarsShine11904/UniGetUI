@@ -41,6 +41,20 @@ public static class AutomationCliCommandRunner
             return subcommand switch
             {
                 "status" => await WriteJsonAsync(output, await client.GetStatusAsync()),
+                "get-app-state" => await WriteJsonAsync(
+                    output,
+                    new
+                    {
+                        status = "success",
+                        app = await client.GetAppInfoAsync(),
+                    }
+                ),
+                "show-app" => await WriteJsonAsync(output, await client.ShowAppAsync()),
+                "navigate-app" => await WriteJsonAsync(
+                    output,
+                    await client.NavigateAppAsync(BuildAppNavigateRequest(args))
+                ),
+                "quit-app" => await WriteJsonAsync(output, await client.QuitAppAsync()),
                 "list-managers" => await WriteJsonAsync(
                     output,
                     new
@@ -512,6 +526,20 @@ public static class AutomationCliCommandRunner
             Architecture = GetOptionalArgument(args, "--architecture"),
             InstallLocation = GetOptionalArgument(args, "--location"),
             OutputPath = GetOptionalArgument(args, "--output"),
+        };
+    }
+
+    private static AutomationAppNavigateRequest BuildAppNavigateRequest(IReadOnlyList<string> args)
+    {
+        return new AutomationAppNavigateRequest
+        {
+            Page = GetRequiredArgument(
+                args,
+                "--page",
+                "The navigate-app automation command requires --page."
+            ),
+            ManagerName = GetOptionalArgument(args, "--manager"),
+            HelpAttachment = GetOptionalArgument(args, "--help-attachment"),
         };
     }
 

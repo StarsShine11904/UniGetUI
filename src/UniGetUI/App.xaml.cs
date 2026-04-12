@@ -390,14 +390,19 @@ namespace UniGetUI
                 if (Settings.Get(Settings.K.DisableApi))
                     return;
 
+                BackgroundApi.AppInfoProvider = () => RunOnUiThread(GetAppInfo);
+                BackgroundApi.ShowAppHandler = () => RunOnUiThread(ShowApp);
+                BackgroundApi.NavigateAppHandler = request => RunOnUiThread(() => NavigateApp(request));
+                BackgroundApi.QuitAppHandler = () => RunOnUiThread(QuitApp);
+
                 BackgroundApi.OnOpenWindow += (_, _) =>
-                    MainWindow.DispatcherQueue.TryEnqueue(() => MainWindow.Activate());
+                    MainWindow.DispatcherQueue.TryEnqueue(() => MainWindow.ShowFromTray());
 
                 BackgroundApi.OnOpenUpdatesPage += (_, _) =>
                     MainWindow.DispatcherQueue.TryEnqueue(() =>
                     {
                         MainWindow?.NavigationPage?.NavigateTo(PageType.Updates);
-                        MainWindow?.Activate();
+                        MainWindow?.ShowFromTray();
                     });
 
                 BackgroundApi.OnShowSharedPackage += (_, package) =>
@@ -431,6 +436,136 @@ namespace UniGetUI
                 Logger.Error("Could not initialize Background API:");
                 Logger.Error(ex);
             }
+        }
+
+        private static T RunOnUiThread<T>(Func<T> action)
+        {
+            if (Instance.MainWindow.DispatcherQueue.HasThreadAccess)
+            {
+                return action();
+            }
+
+            var completion = new TaskCompletionSource<T>(
+                TaskCreationOptions.RunContinuationsAsynchronously
+            );
+            if (!Instance.MainWindow.DispatcherQueue.TryEnqueue(() =>
+                {
+                    try
+                    {
+                        completion.SetResult(action());
+                    }
+                    catch (Exception ex)
+                    {
+                        completion.SetException(ex);
+                    }
+                }))
+            {
+                throw new InvalidOperationException("Failed to dispatch the app automation request.");
+            }
+
+            return completion.Task.GetAwaiter().GetResult();
+        }
+
+        private AutomationAppInfo GetAppInfo()
+        {
+            return new AutomationAppInfo
+            {
+                Headless = false,
+                WindowAvailable = MainWindow is not null,
+                WindowVisible = MainWindow?.IsInterfaceVisible ?? false,
+                CanShowWindow = MainWindow is not null,
+                CanNavigate = MainWindow?.NavigationPage is not null,
+                CanQuit = true,
+                CurrentPage = MainWindow?.NavigationPage is null
+                    ? ""
+                    : AutomationAppPages.ToPageName(MainWindow.NavigationPage.CurrentPage.ToString()),
+                SupportedPages = AutomationAppPages.SupportedPages,
+            };
+        }
+
+        private BackgroundApiCommandResult ShowApp()
+        {
+            MainWindow.ShowFromTray();
+            return BackgroundApiCommandResult.Success("show-app");
+        }
+
+        private BackgroundApiCommandResult NavigateApp(AutomationAppNavigateRequest request)
+        {
+            string page = AutomationAppPages.NormalizePageName(request.Page);
+            IPackageManager? manager = ResolveManager(request.ManagerName);
+
+            switch (page)
+            {
+                case "discover":
+                    MainWindow.NavigationPage.NavigateTo(PageType.Discover);
+                    break;
+                case "updates":
+                    MainWindow.NavigationPage.NavigateTo(PageType.Updates);
+                    break;
+                case "installed":
+                    MainWindow.NavigationPage.NavigateTo(PageType.Installed);
+                    break;
+                case "bundles":
+                    MainWindow.NavigationPage.NavigateTo(PageType.Bundles);
+                    break;
+                case "settings":
+                    MainWindow.NavigationPage.NavigateTo(PageType.Settings);
+                    break;
+                case "managers":
+                    MainWindow.NavigationPage.OpenManagerSettings(manager);
+                    break;
+                case "own-log":
+                    MainWindow.NavigationPage.NavigateTo(PageType.OwnLog);
+                    break;
+                case "manager-log":
+                    MainWindow.NavigationPage.OpenManagerLogs(manager);
+                    break;
+                case "operation-history":
+                    MainWindow.NavigationPage.NavigateTo(PageType.OperationHistory);
+                    break;
+                case "help":
+                    MainWindow.NavigationPage.ShowHelp(request.HelpAttachment ?? "");
+                    break;
+                case "release-notes":
+                    _ = DialogHelper.ShowReleaseNotes();
+                    break;
+                case "about":
+                    _ = DialogHelper.ShowAboutUniGetUI();
+                    break;
+                default:
+                    throw new InvalidOperationException(
+                        $"Unsupported app page \"{request.Page}\"."
+                    );
+            }
+
+            MainWindow.ShowFromTray();
+            return BackgroundApiCommandResult.Success("navigate-app");
+        }
+
+        private BackgroundApiCommandResult QuitApp()
+        {
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(150);
+                RunOnUiThread(() =>
+                {
+                    DisposeAndQuit();
+                    return true;
+                });
+            });
+            return BackgroundApiCommandResult.Success("quit-app");
+        }
+
+        private static IPackageManager? ResolveManager(string? managerName)
+        {
+            if (string.IsNullOrWhiteSpace(managerName))
+            {
+                return null;
+            }
+
+            return PEInterface.Managers.FirstOrDefault(manager =>
+                manager.Name.Equals(managerName, StringComparison.OrdinalIgnoreCase))
+                ?? throw new InvalidOperationException($"Unknown manager \"{managerName}\".");
         }
 
         private async Task CheckForMissingDependencies()

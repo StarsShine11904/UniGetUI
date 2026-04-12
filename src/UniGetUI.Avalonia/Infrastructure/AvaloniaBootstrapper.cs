@@ -11,6 +11,7 @@ using UniGetUI.Interface;
 using UniGetUI.Interface.Telemetry;
 using UniGetUI.PackageEngine;
 using UniGetUI.PackageEngine.Classes.Manager.Classes;
+using UniGetUI.PackageEngine.Interfaces;
 
 namespace UniGetUI.Avalonia.Infrastructure;
 
@@ -97,6 +98,14 @@ internal static class AvaloniaBootstrapper
                 return;
 
             _backgroundApi = new BackgroundApiRunner();
+            _backgroundApi.AppInfoProvider = () =>
+                Dispatcher.UIThread.InvokeAsync(GetAppInfo).GetAwaiter().GetResult();
+            _backgroundApi.ShowAppHandler = () =>
+                Dispatcher.UIThread.InvokeAsync(ShowApp).GetAwaiter().GetResult();
+            _backgroundApi.NavigateAppHandler = request =>
+                Dispatcher.UIThread.InvokeAsync(() => NavigateApp(request)).GetAwaiter().GetResult();
+            _backgroundApi.QuitAppHandler = () =>
+                Dispatcher.UIThread.InvokeAsync(QuitApp).GetAwaiter().GetResult();
 
             _backgroundApi.OnOpenWindow += (_, _) =>
                 Dispatcher.UIThread.Post(() => MainWindow.Instance?.ShowFromTray());
@@ -137,6 +146,111 @@ internal static class AvaloniaBootstrapper
     }
 
     public static void StopBackgroundApi() => _backgroundApi?.Stop();
+
+    private static AutomationAppInfo GetAppInfo()
+    {
+        MainWindow? window = MainWindow.Instance;
+        return new AutomationAppInfo
+        {
+            Headless = false,
+            WindowAvailable = window is not null,
+            WindowVisible = window?.IsVisible ?? false,
+            CanShowWindow = window is not null,
+            CanNavigate = window is not null,
+            CanQuit = true,
+            CurrentPage = window is null ? "" : AutomationAppPages.ToPageName(window.CurrentPage.ToString()),
+            SupportedPages = AutomationAppPages.SupportedPages,
+        };
+    }
+
+    private static BackgroundApiCommandResult ShowApp()
+    {
+        MainWindow window = MainWindow.Instance
+            ?? throw new InvalidOperationException("The application window is not available.");
+        window.ShowFromTray();
+        return BackgroundApiCommandResult.Success("show-app");
+    }
+
+    private static BackgroundApiCommandResult NavigateApp(AutomationAppNavigateRequest request)
+    {
+        MainWindow window = MainWindow.Instance
+            ?? throw new InvalidOperationException("The application window is not available.");
+        string page = AutomationAppPages.NormalizePageName(request.Page);
+        var manager = ResolveManager(request.ManagerName);
+
+        switch (page)
+        {
+            case "discover":
+                window.Navigate(PageType.Discover);
+                break;
+            case "updates":
+                window.Navigate(PageType.Updates);
+                break;
+            case "installed":
+                window.Navigate(PageType.Installed);
+                break;
+            case "bundles":
+                window.Navigate(PageType.Bundles);
+                break;
+            case "settings":
+                window.Navigate(PageType.Settings);
+                break;
+            case "managers":
+                window.OpenManagerSettings(manager);
+                break;
+            case "own-log":
+                window.Navigate(PageType.OwnLog);
+                break;
+            case "manager-log":
+                window.OpenManagerLogs(manager);
+                break;
+            case "operation-history":
+                window.Navigate(PageType.OperationHistory);
+                break;
+            case "help":
+                window.ShowHelp(request.HelpAttachment ?? "");
+                break;
+            case "release-notes":
+                window.Navigate(PageType.ReleaseNotes);
+                break;
+            case "about":
+                window.Navigate(PageType.About);
+                break;
+            default:
+                throw new InvalidOperationException(
+                    $"Unsupported app page \"{request.Page}\"."
+                );
+        }
+
+        window.ShowFromTray();
+        return BackgroundApiCommandResult.Success("navigate-app");
+    }
+
+    private static BackgroundApiCommandResult QuitApp()
+    {
+        MainWindow window = MainWindow.Instance
+            ?? throw new InvalidOperationException("The application window is not available.");
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(150);
+            await Dispatcher.UIThread.InvokeAsync(window.QuitApplication);
+        });
+        return BackgroundApiCommandResult.Success("quit-app");
+    }
+
+    private static IPackageManager? ResolveManager(string? managerName)
+    {
+        if (string.IsNullOrWhiteSpace(managerName))
+        {
+            return null;
+        }
+
+        return PEInterface.Managers.FirstOrDefault(manager =>
+            manager.Name.Equals(managerName, StringComparison.OrdinalIgnoreCase))
+            ?? throw new InvalidOperationException(
+                $"Unknown manager \"{managerName}\"."
+            );
+    }
 
     private static async Task LoadElevatorAsync()
     {

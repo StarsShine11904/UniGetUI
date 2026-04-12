@@ -78,6 +78,8 @@ function Write-Stage {
     Write-Host "== $Name =="
 }
 
+$gracefulShutdown = $false
+
 try {
     function Invoke-CliJson {
         param(
@@ -147,6 +149,21 @@ try {
     if (-not $status.running) {
         $daemonOutput = Get-DaemonLog
         throw "Headless daemon never became ready.`n$daemonOutput"
+    }
+
+    Write-Stage 'App lifecycle'
+    $appState = Invoke-CliJson -Arguments @('get-app-state')
+    if (-not $appState.app.headless) {
+        throw "get-app-state did not report a headless session"
+    }
+    if ($appState.app.windowAvailable) {
+        throw "get-app-state incorrectly reported a window for the headless session"
+    }
+    if ($appState.app.canNavigate) {
+        throw "get-app-state incorrectly reported navigation support in headless mode"
+    }
+    if (-not $appState.app.canQuit) {
+        throw "get-app-state did not report quit support"
     }
 
     Write-Stage 'Manager and settings inspection'
@@ -530,9 +547,27 @@ try {
     if ($disableFreshBool.setting.boolValue) {
         throw "set-setting did not disable FreshBoolSetting"
     }
+
+    $quitApp = Invoke-CliJson -Arguments @('quit-app')
+    if ($quitApp.status -ne 'success') {
+        throw "quit-app did not return success"
+    }
+
+    $quitDeadline = (Get-Date).AddSeconds(20)
+    while (-not $process.HasExited -and (Get-Date) -lt $quitDeadline) {
+        Start-Sleep -Seconds 1
+    }
+
+    if (-not $process.HasExited) {
+        throw "quit-app did not stop the headless daemon"
+    }
+
+    $gracefulShutdown = $true
 }
 finally {
-    Stop-Daemon
+    if (-not $gracefulShutdown) {
+        Stop-Daemon
+    }
 
     $daemonLog = Get-DaemonLog
     if (-not [string]::IsNullOrWhiteSpace($daemonLog)) {
