@@ -37,6 +37,15 @@
 | `--automation get-app-log [--level n]` | Reads the UniGetUI application log as structured JSON, with optional severity filtering | 2026.1+ |
 | `--automation get-operation-history` | Reads the persisted operation history shown by the log/history UI surfaces | 2026.1+ |
 | `--automation get-manager-log [--manager name] [--verbose]` | Reads manager task logs, optionally for one manager and with verbose subprocess/stdin/stdout detail | 2026.1+ |
+| `--automation get-backup-status` | Reads local-backup settings, resolved backup output metadata, and current GitHub cloud-auth/device-flow state | 2026.1+ |
+| `--automation create-local-backup` | Creates a local `.ubundle` backup using the current backup settings and returns the written path | 2026.1+ |
+| `--automation start-github-sign-in [--launch-browser]` | Starts a headless-friendly GitHub device-flow sign-in for cloud backup and returns the verification URI and user code | 2026.1+ |
+| `--automation complete-github-sign-in` | Completes the pending GitHub device-flow sign-in after the user authorizes the device code | 2026.1+ |
+| `--automation sign-out-github` | Clears the stored GitHub cloud-backup session token | 2026.1+ |
+| `--automation list-cloud-backups` | Lists the cloud backups stored in the authenticated GitHub backup gist | 2026.1+ |
+| `--automation create-cloud-backup` | Uploads the current installed-package backup bundle to the authenticated GitHub backup gist | 2026.1+ |
+| `--automation download-cloud-backup --key name` | Downloads one cloud backup as raw bundle content | 2026.1+ |
+| `--automation restore-cloud-backup --key name [--append]` | Downloads a cloud backup and imports it into the current in-memory bundle | 2026.1+ |
 | `--automation get-bundle` | Reads the current in-memory package bundle as structured JSON, including compatibility and selected install-version metadata | 2026.1+ |
 | `--automation reset-bundle` | Clears the current in-memory package bundle | 2026.1+ |
 | `--automation import-bundle (--path path \| --content text) [--format {ubundle\|json\|yaml\|xml}] [--append]` | Loads bundle content from a file path or raw content, optionally appending instead of replacing the current bundle | 2026.1+ |
@@ -76,7 +85,7 @@
 
 - `dotnet src\UniGetUI.Avalonia\bin\Release\net10.0\UniGetUI.Avalonia.dll --headless` starts the local automation daemon without opening any window or requiring a graphical desktop session.
 - `dotnet src\UniGetUI.Cli\bin\Release\net10.0\UniGetUI.Cli.dll <command>` is the cross-platform CLI wrapper for the automation service. It automatically prepends `--automation`, so `UniGetUI.Cli status` and `UniGetUI.Cli search-packages --manager ".NET Tool" --query dotnetsay` work directly.
-- Current agent-oriented command coverage includes status/version, manager/source inspection, settings inspection and mutation, desktop-shortcut state management, app/history/manager log inspection, current bundle inspection/import/export/add/remove/install flows, package search/details/version listing, ignored-update management, and package install/update/uninstall flows.
+- Current agent-oriented command coverage includes status/version, manager/source inspection, settings inspection and mutation, desktop-shortcut state management, app/history/manager log inspection, local backup creation and GitHub cloud-backup/auth flows, current bundle inspection/import/export/add/remove/install flows, package search/details/version listing, ignored-update management, and package install/update/uninstall flows.
 
 <br><br>
 # `unigetui://` deep link

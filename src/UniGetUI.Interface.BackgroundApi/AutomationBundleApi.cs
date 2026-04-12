@@ -558,7 +558,7 @@ public static class AutomationBundleApi
         };
     }
 
-    private static async Task<string> CreateBundleAsync(IReadOnlyList<IPackage> unsortedPackages)
+    internal static async Task<string> CreateBundleAsync(IReadOnlyList<IPackage> unsortedPackages)
     {
         var exportableData = new SerializableBundle();
         var packages = unsortedPackages.ToList();
@@ -592,7 +592,7 @@ public static class AutomationBundleApi
         return exportableData.AsJsonString();
     }
 
-    private static async Task<(double SchemaVersion, BundleReport Report)> AddFromBundleAsync(
+    internal static async Task<(double SchemaVersion, BundleReport Report)> AddFromBundleAsync(
         string content,
         BundleFormatType format
     )

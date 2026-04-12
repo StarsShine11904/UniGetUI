@@ -166,6 +166,50 @@ public static class AutomationCliCommandRunner
                         ),
                     }
                 ),
+                "get-backup-status" => await WriteJsonAsync(
+                    output,
+                    new
+                    {
+                        status = "success",
+                        backup = await client.GetBackupStatusAsync(),
+                    }
+                ),
+                "create-local-backup" => await WriteJsonAsync(
+                    output,
+                    await client.CreateLocalBackupAsync()
+                ),
+                "start-github-sign-in" => await WriteJsonAsync(
+                    output,
+                    await client.StartGitHubDeviceFlowAsync(BuildGitHubDeviceFlowRequest(args))
+                ),
+                "complete-github-sign-in" => await WriteJsonAsync(
+                    output,
+                    await client.CompleteGitHubDeviceFlowAsync()
+                ),
+                "sign-out-github" => await WriteJsonAsync(
+                    output,
+                    await client.SignOutGitHubAsync()
+                ),
+                "list-cloud-backups" => await WriteJsonAsync(
+                    output,
+                    new
+                    {
+                        status = "success",
+                        backups = await client.ListCloudBackupsAsync(),
+                    }
+                ),
+                "create-cloud-backup" => await WriteJsonAsync(
+                    output,
+                    await client.CreateCloudBackupAsync()
+                ),
+                "download-cloud-backup" => await WriteJsonAsync(
+                    output,
+                    await client.DownloadCloudBackupAsync(BuildCloudBackupRequest(args))
+                ),
+                "restore-cloud-backup" => await WriteJsonAsync(
+                    output,
+                    await client.RestoreCloudBackupAsync(BuildCloudBackupRequest(args))
+                ),
                 "get-bundle" => await WriteJsonAsync(
                     output,
                     new
@@ -410,6 +454,29 @@ public static class AutomationCliCommandRunner
             Path = GetOptionalArgument(args, "--path"),
             Content = GetOptionalArgument(args, "--content"),
             Format = GetOptionalArgument(args, "--format"),
+            Append = args.Contains("--append"),
+        };
+    }
+
+    private static AutomationGitHubDeviceFlowRequest BuildGitHubDeviceFlowRequest(
+        IReadOnlyList<string> args
+    )
+    {
+        return new AutomationGitHubDeviceFlowRequest
+        {
+            LaunchBrowser = args.Contains("--launch-browser"),
+        };
+    }
+
+    private static AutomationCloudBackupRequest BuildCloudBackupRequest(IReadOnlyList<string> args)
+    {
+        return new AutomationCloudBackupRequest
+        {
+            Key = GetRequiredArgument(
+                args,
+                "--key",
+                "This automation command requires --key."
+            ),
             Append = args.Contains("--append"),
         };
     }

@@ -237,6 +237,119 @@ public sealed class BackgroundApiClient : IDisposable
         ) ?? [];
     }
 
+    public async Task<AutomationBackupStatus?> GetBackupStatusAsync()
+    {
+        return await ReadAuthenticatedJsonAsync<AutomationBackupStatus>(
+            HttpMethod.Get,
+            "/v3/backups/status"
+        );
+    }
+
+    public async Task<AutomationLocalBackupResult> CreateLocalBackupAsync()
+    {
+        return await ReadAuthenticatedJsonAsync<AutomationLocalBackupResult>(
+                HttpMethod.Post,
+                "/v3/backups/local/create"
+            )
+            ?? new AutomationLocalBackupResult
+            {
+                Status = "error",
+                Message = "The background API returned an empty response.",
+            };
+    }
+
+    public async Task<AutomationGitHubAuthResult> StartGitHubDeviceFlowAsync(
+        AutomationGitHubDeviceFlowRequest request
+    )
+    {
+        return await ReadAuthenticatedJsonWithBodyAsync<
+                AutomationGitHubAuthResult,
+                AutomationGitHubDeviceFlowRequest
+            >("/v3/backups/github/sign-in/start", request)
+            ?? new AutomationGitHubAuthResult
+            {
+                Status = "error",
+                Message = "The background API returned an empty response.",
+            };
+    }
+
+    public async Task<AutomationGitHubAuthResult> CompleteGitHubDeviceFlowAsync()
+    {
+        return await ReadAuthenticatedJsonAsync<AutomationGitHubAuthResult>(
+                HttpMethod.Post,
+                "/v3/backups/github/sign-in/complete"
+            )
+            ?? new AutomationGitHubAuthResult
+            {
+                Status = "error",
+                Message = "The background API returned an empty response.",
+            };
+    }
+
+    public async Task<AutomationGitHubAuthResult> SignOutGitHubAsync()
+    {
+        return await ReadAuthenticatedJsonAsync<AutomationGitHubAuthResult>(
+                HttpMethod.Post,
+                "/v3/backups/github/sign-out"
+            )
+            ?? new AutomationGitHubAuthResult
+            {
+                Status = "error",
+                Message = "The background API returned an empty response.",
+            };
+    }
+
+    public async Task<IReadOnlyList<AutomationCloudBackupEntry>> ListCloudBackupsAsync()
+    {
+        return await ReadAuthenticatedJsonAsync<IReadOnlyList<AutomationCloudBackupEntry>>(
+            HttpMethod.Get,
+            "/v3/backups/cloud"
+        ) ?? [];
+    }
+
+    public async Task<AutomationCloudBackupUploadResult> CreateCloudBackupAsync()
+    {
+        return await ReadAuthenticatedJsonAsync<AutomationCloudBackupUploadResult>(
+                HttpMethod.Post,
+                "/v3/backups/cloud/create"
+            )
+            ?? new AutomationCloudBackupUploadResult
+            {
+                Status = "error",
+                Message = "The background API returned an empty response.",
+            };
+    }
+
+    public async Task<AutomationCloudBackupContentResult> DownloadCloudBackupAsync(
+        AutomationCloudBackupRequest request
+    )
+    {
+        return await ReadAuthenticatedJsonWithBodyAsync<
+                AutomationCloudBackupContentResult,
+                AutomationCloudBackupRequest
+            >("/v3/backups/cloud/download", request)
+            ?? new AutomationCloudBackupContentResult
+            {
+                Status = "error",
+                Message = "The background API returned an empty response.",
+            };
+    }
+
+    public async Task<AutomationCloudBackupRestoreResult> RestoreCloudBackupAsync(
+        AutomationCloudBackupRequest request
+    )
+    {
+        return await ReadAuthenticatedJsonWithBodyAsync<
+                AutomationCloudBackupRestoreResult,
+                AutomationCloudBackupRequest
+            >("/v3/backups/cloud/restore", request)
+            ?? new AutomationCloudBackupRestoreResult
+            {
+                Status = "error",
+                Message = "The background API returned an empty response.",
+            };
+    }
+
     public async Task<AutomationBundleInfo> GetBundleAsync()
     {
         return await ReadAuthenticatedJsonAsync<AutomationBundleInfo>(HttpMethod.Get, "/v3/bundles")
@@ -820,6 +933,26 @@ public sealed class BackgroundApiClient : IDisposable
         if (relativePath.StartsWith("/v3/bundles/install", StringComparison.OrdinalIgnoreCase))
         {
             return TimeSpan.FromMinutes(5);
+        }
+
+        if (
+            relativePath.StartsWith("/v3/backups/github/sign-in/complete", StringComparison.OrdinalIgnoreCase)
+        )
+        {
+            return TimeSpan.FromMinutes(5);
+        }
+
+        if (
+            relativePath.StartsWith("/v3/backups/local/create", StringComparison.OrdinalIgnoreCase)
+            || relativePath.StartsWith("/v3/backups/cloud/create", StringComparison.OrdinalIgnoreCase)
+        )
+        {
+            return TimeSpan.FromMinutes(2);
+        }
+
+        if (relativePath.StartsWith("/v3/backups/", StringComparison.OrdinalIgnoreCase))
+        {
+            return method == HttpMethod.Post ? TimeSpan.FromMinutes(1) : TimeSpan.FromSeconds(30);
         }
 
         if (relativePath.StartsWith("/v3/bundles/", StringComparison.OrdinalIgnoreCase))

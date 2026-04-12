@@ -227,6 +227,58 @@ try {
         throw "set-setting did not enable FreshBoolSetting"
     }
 
+    Write-Stage 'Backup inspection'
+    $backupStatus = Invoke-CliJson -Arguments @('get-backup-status')
+    if ([string]::IsNullOrWhiteSpace($backupStatus.backup.backupDirectory)) {
+        throw "get-backup-status did not report the resolved backup directory"
+    }
+    if ($backupStatus.backup.auth.isAuthenticated) {
+        throw "get-backup-status unexpectedly reported an authenticated GitHub backup session in the isolated test profile"
+    }
+
+    $backupDirectory = Join-Path $daemonRoot 'backups'
+    $setBackupDirectory = Invoke-CliJson -Arguments @(
+        'set-setting',
+        '--key', 'ChangeBackupOutputDirectory',
+        '--value', $backupDirectory
+    )
+    if ($setBackupDirectory.setting.stringValue -ne $backupDirectory) {
+        throw "set-setting did not persist ChangeBackupOutputDirectory"
+    }
+
+    $setBackupFileName = Invoke-CliJson -Arguments @(
+        'set-setting',
+        '--key', 'ChangeBackupFileName',
+        '--value', 'cli-e2e-backup'
+    )
+    if ($setBackupFileName.setting.stringValue -ne 'cli-e2e-backup') {
+        throw "set-setting did not persist ChangeBackupFileName"
+    }
+
+    $disableBackupTimestamping = Invoke-CliJson -Arguments @(
+        'set-setting',
+        '--key', 'EnableBackupTimestamping',
+        '--enabled', 'false'
+    )
+    if ($disableBackupTimestamping.setting.boolValue) {
+        throw "set-setting did not disable EnableBackupTimestamping"
+    }
+
+    $localBackup = Invoke-CliJson -Arguments @('create-local-backup')
+    if ($localBackup.status -ne 'success') {
+        throw "create-local-backup failed: $($localBackup | ConvertTo-Json -Depth 8)"
+    }
+    if (-not (Test-Path $localBackup.path)) {
+        throw "create-local-backup did not write the reported backup file"
+    }
+    if (-not $localBackup.path.EndsWith('cli-e2e-backup.ubundle')) {
+        throw "create-local-backup did not honor the configured backup file name"
+    }
+    $localBackupContents = Get-Content $localBackup.path -Raw
+    if ($localBackupContents -notmatch '"packages"' -or $localBackupContents -notmatch '"export_version"') {
+        throw "create-local-backup did not write recognizable bundle content"
+    }
+
     Write-Stage 'Package discovery'
     $search = Invoke-CliJson -Arguments @('search-packages', '--manager', '.NET Tool', '--query', 'dotnetsay', '--max-results', '20')
     $searchMatch = @($search.packages | Where-Object { $_.id -eq 'dotnetsay' })

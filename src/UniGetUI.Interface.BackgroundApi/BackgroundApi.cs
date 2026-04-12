@@ -84,6 +84,21 @@ namespace UniGetUI.Interface
                         endpoints.MapGet("/v3/logs/app", V3_GetAppLog);
                         endpoints.MapGet("/v3/logs/history", V3_GetOperationHistory);
                         endpoints.MapGet("/v3/logs/manager", V3_GetManagerLog);
+                        endpoints.MapGet("/v3/backups/status", V3_GetBackupStatus);
+                        endpoints.MapPost("/v3/backups/local/create", V3_CreateLocalBackup);
+                        endpoints.MapPost(
+                            "/v3/backups/github/sign-in/start",
+                            V3_StartGitHubDeviceFlow
+                        );
+                        endpoints.MapPost(
+                            "/v3/backups/github/sign-in/complete",
+                            V3_CompleteGitHubDeviceFlow
+                        );
+                        endpoints.MapPost("/v3/backups/github/sign-out", V3_SignOutGitHub);
+                        endpoints.MapGet("/v3/backups/cloud", V3_ListCloudBackups);
+                        endpoints.MapPost("/v3/backups/cloud/create", V3_CreateCloudBackup);
+                        endpoints.MapPost("/v3/backups/cloud/download", V3_DownloadCloudBackup);
+                        endpoints.MapPost("/v3/backups/cloud/restore", V3_RestoreCloudBackup);
                         endpoints.MapGet("/v3/bundles", V3_GetBundle);
                         endpoints.MapPost("/v3/bundles/reset", V3_ResetBundle);
                         endpoints.MapPost("/v3/bundles/import", V3_ImportBundle);
@@ -572,6 +587,170 @@ namespace UniGetUI.Interface
             }
         }
 
+        private async Task V3_GetBackupStatus(HttpContext context)
+        {
+            if (!AuthenticateToken(context.Request.Query["token"]))
+            {
+                context.Response.StatusCode = 401;
+                return;
+            }
+
+            await context.Response.WriteAsJsonAsync(
+                await AutomationBackupApi.GetStatusAsync(),
+                new JsonSerializerOptions(SerializationHelpers.DefaultOptions)
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    WriteIndented = true,
+                }
+            );
+        }
+
+        private async Task V3_CreateLocalBackup(HttpContext context)
+        {
+            if (!AuthenticateToken(context.Request.Query["token"]))
+            {
+                context.Response.StatusCode = 401;
+                return;
+            }
+
+            try
+            {
+                await context.Response.WriteAsJsonAsync(
+                    await AutomationBackupApi.CreateLocalBackupAsync(),
+                    new JsonSerializerOptions(SerializationHelpers.DefaultOptions)
+                    {
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                        WriteIndented = true,
+                    }
+                );
+            }
+            catch (InvalidOperationException ex)
+            {
+                context.Response.StatusCode = 400;
+                await context.Response.WriteAsync(ex.Message);
+            }
+        }
+
+        private async Task V3_StartGitHubDeviceFlow(HttpContext context)
+        {
+            await HandleBackupActionAsync<
+                AutomationGitHubDeviceFlowRequest,
+                AutomationGitHubAuthResult
+            >(context, AutomationBackupApi.StartGitHubDeviceFlowAsync);
+        }
+
+        private async Task V3_CompleteGitHubDeviceFlow(HttpContext context)
+        {
+            if (!AuthenticateToken(context.Request.Query["token"]))
+            {
+                context.Response.StatusCode = 401;
+                return;
+            }
+
+            try
+            {
+                await context.Response.WriteAsJsonAsync(
+                    await AutomationBackupApi.CompleteGitHubDeviceFlowAsync(),
+                    new JsonSerializerOptions(SerializationHelpers.DefaultOptions)
+                    {
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                        WriteIndented = true,
+                    }
+                );
+            }
+            catch (InvalidOperationException ex)
+            {
+                context.Response.StatusCode = 400;
+                await context.Response.WriteAsync(ex.Message);
+            }
+        }
+
+        private async Task V3_SignOutGitHub(HttpContext context)
+        {
+            if (!AuthenticateToken(context.Request.Query["token"]))
+            {
+                context.Response.StatusCode = 401;
+                return;
+            }
+
+            await context.Response.WriteAsJsonAsync(
+                await AutomationBackupApi.SignOutGitHubAsync(),
+                new JsonSerializerOptions(SerializationHelpers.DefaultOptions)
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    WriteIndented = true,
+                }
+            );
+        }
+
+        private async Task V3_ListCloudBackups(HttpContext context)
+        {
+            if (!AuthenticateToken(context.Request.Query["token"]))
+            {
+                context.Response.StatusCode = 401;
+                return;
+            }
+
+            try
+            {
+                await context.Response.WriteAsJsonAsync(
+                    await AutomationBackupApi.ListCloudBackupsAsync(),
+                    new JsonSerializerOptions(SerializationHelpers.DefaultOptions)
+                    {
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                        WriteIndented = true,
+                    }
+                );
+            }
+            catch (InvalidOperationException ex)
+            {
+                context.Response.StatusCode = 400;
+                await context.Response.WriteAsync(ex.Message);
+            }
+        }
+
+        private async Task V3_CreateCloudBackup(HttpContext context)
+        {
+            if (!AuthenticateToken(context.Request.Query["token"]))
+            {
+                context.Response.StatusCode = 401;
+                return;
+            }
+
+            try
+            {
+                await context.Response.WriteAsJsonAsync(
+                    await AutomationBackupApi.CreateCloudBackupAsync(),
+                    new JsonSerializerOptions(SerializationHelpers.DefaultOptions)
+                    {
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                        WriteIndented = true,
+                    }
+                );
+            }
+            catch (InvalidOperationException ex)
+            {
+                context.Response.StatusCode = 400;
+                await context.Response.WriteAsync(ex.Message);
+            }
+        }
+
+        private async Task V3_DownloadCloudBackup(HttpContext context)
+        {
+            await HandleBackupActionAsync<
+                AutomationCloudBackupRequest,
+                AutomationCloudBackupContentResult
+            >(context, AutomationBackupApi.DownloadCloudBackupAsync);
+        }
+
+        private async Task V3_RestoreCloudBackup(HttpContext context)
+        {
+            await HandleBackupActionAsync<
+                AutomationCloudBackupRequest,
+                AutomationCloudBackupRestoreResult
+            >(context, AutomationBackupApi.RestoreCloudBackupAsync);
+        }
+
         private async Task V3_GetBundle(HttpContext context)
         {
             if (!AuthenticateToken(context.Request.Query["token"]))
@@ -1008,6 +1187,35 @@ namespace UniGetUI.Interface
         }
 
         private static async Task HandleBundleActionAsync<TRequest, TResult>(
+            HttpContext context,
+            Func<TRequest, Task<TResult>> action
+        )
+        {
+            if (!AuthenticateToken(context.Request.Query["token"]))
+            {
+                context.Response.StatusCode = 401;
+                return;
+            }
+
+            try
+            {
+                await context.Response.WriteAsJsonAsync(
+                    await action(await ReadJsonBodyAsync<TRequest>(context)),
+                    new JsonSerializerOptions(SerializationHelpers.DefaultOptions)
+                    {
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                        WriteIndented = true,
+                    }
+                );
+            }
+            catch (InvalidOperationException ex)
+            {
+                context.Response.StatusCode = 400;
+                await context.Response.WriteAsync(ex.Message);
+            }
+        }
+
+        private static async Task HandleBackupActionAsync<TRequest, TResult>(
             HttpContext context,
             Func<TRequest, Task<TResult>> action
         )
