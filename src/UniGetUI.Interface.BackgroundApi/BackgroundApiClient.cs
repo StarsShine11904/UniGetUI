@@ -748,6 +748,20 @@ public sealed class BackgroundApiClient : IDisposable
         return await SendPackageOperationAsync("/v3/packages/install", request);
     }
 
+    public async Task<AutomationPackageOperationResult> DownloadPackageAsync(
+        AutomationPackageActionRequest request
+    )
+    {
+        return await SendPackageOperationAsync("/v3/packages/download", request);
+    }
+
+    public async Task<AutomationPackageOperationResult> ReinstallPackageAsync(
+        AutomationPackageActionRequest request
+    )
+    {
+        return await SendPackageOperationAsync("/v3/packages/reinstall", request);
+    }
+
     public async Task<AutomationPackageOperationResult> UpdatePackageAsync(
         AutomationPackageActionRequest request
     )
@@ -760,6 +774,16 @@ public sealed class BackgroundApiClient : IDisposable
     )
     {
         return await SendPackageOperationAsync("/v3/packages/uninstall", request);
+    }
+
+    public async Task<AutomationPackageOperationResult> UninstallThenReinstallPackageAsync(
+        AutomationPackageActionRequest request
+    )
+    {
+        return await SendPackageOperationAsync(
+            "/v3/packages/uninstall-then-reinstall",
+            request
+        );
     }
 
     public static IReadOnlyList<BackgroundApiUpdateEntry> ParseUpdatesPayload(string payload)
@@ -1024,6 +1048,41 @@ public sealed class BackgroundApiClient : IDisposable
         if (request.PreRelease.HasValue)
         {
             parameters["preRelease"] = request.PreRelease.Value ? "true" : "false";
+        }
+
+        if (request.Elevated.HasValue)
+        {
+            parameters["elevated"] = request.Elevated.Value ? "true" : "false";
+        }
+
+        if (request.Interactive.HasValue)
+        {
+            parameters["interactive"] = request.Interactive.Value ? "true" : "false";
+        }
+
+        if (request.SkipHash.HasValue)
+        {
+            parameters["skipHash"] = request.SkipHash.Value ? "true" : "false";
+        }
+
+        if (request.RemoveData.HasValue)
+        {
+            parameters["removeData"] = request.RemoveData.Value ? "true" : "false";
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Architecture))
+        {
+            parameters["architecture"] = request.Architecture;
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.InstallLocation))
+        {
+            parameters["location"] = request.InstallLocation;
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.OutputPath))
+        {
+            parameters["outputPath"] = request.OutputPath;
         }
 
         return parameters;

@@ -30,6 +30,13 @@ public sealed class AutomationPackageActionRequest
     public string? Version { get; set; }
     public string? Scope { get; set; }
     public bool? PreRelease { get; set; }
+    public bool? Elevated { get; set; }
+    public bool? Interactive { get; set; }
+    public bool? SkipHash { get; set; }
+    public bool? RemoveData { get; set; }
+    public string? Architecture { get; set; }
+    public string? InstallLocation { get; set; }
+    public string? OutputPath { get; set; }
 }
 
 public sealed class AutomationPackageOperationResult
@@ -39,6 +46,7 @@ public sealed class AutomationPackageOperationResult
     public string OperationStatus { get; set; } = "";
     public string? Message { get; set; }
     public AutomationPackageInfo? Package { get; set; }
+    public string? OutputPath { get; set; }
     public IReadOnlyList<string> Output { get; set; } = [];
 }
 
@@ -185,6 +193,74 @@ public static class AutomationPackageApi
             request,
             (pkg, options) => new UninstallPackageOperation(pkg, options)
         );
+    }
+
+    public static async Task<AutomationPackageOperationResult> DownloadPackageAsync(
+        AutomationPackageActionRequest request
+    )
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (string.IsNullOrWhiteSpace(request.OutputPath))
+        {
+            throw new InvalidOperationException(
+                "The outputPath parameter is required when downloading a package."
+            );
+        }
+
+        var package = FindAnyPackage(request);
+        if (!package.Manager.Capabilities.CanDownloadInstaller)
+        {
+            throw new InvalidOperationException(
+                $"The manager \"{package.Manager.Name}\" does not support installer downloads."
+            );
+        }
+
+        using var operation = new DownloadOperation(package, request.OutputPath);
+        await operation.MainThread();
+
+        return CreateOperationResult(
+            "download-package",
+            package,
+            operation,
+            operation.DownloadLocation
+        );
+    }
+
+    public static Task<AutomationPackageOperationResult> ReinstallPackageAsync(
+        AutomationPackageActionRequest request
+    )
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var package = FindInstalledPackage(request);
+        return ExecuteOperationAsync(
+            "reinstall-package",
+            package,
+            request,
+            (pkg, options) => new InstallPackageOperation(pkg, options)
+        );
+    }
+
+    public static async Task<AutomationPackageOperationResult> UninstallThenReinstallPackageAsync(
+        AutomationPackageActionRequest request
+    )
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var package = FindInstalledPackage(request);
+        var options = await InstallOptionsFactory.LoadApplicableAsync(package);
+        ApplyRequestOptions(options, request);
+
+        using var uninstallOperation = new UninstallPackageOperation(package, options);
+        using var installOperation = new InstallPackageOperation(
+            package,
+            options,
+            req: uninstallOperation
+        );
+        await installOperation.MainThread();
+
+        return CreateOperationResult("uninstall-then-reinstall-package", package, installOperation);
     }
 
     public static async Task<AutomationPackageDetailsInfo> GetPackageDetailsAsync(
@@ -350,6 +426,36 @@ public static class AutomationPackageApi
         {
             options.PreRelease = request.PreRelease.Value;
         }
+
+        if (request.Elevated.HasValue)
+        {
+            options.RunAsAdministrator = request.Elevated.Value;
+        }
+
+        if (request.Interactive.HasValue)
+        {
+            options.InteractiveInstallation = request.Interactive.Value;
+        }
+
+        if (request.SkipHash.HasValue)
+        {
+            options.SkipHashCheck = request.SkipHash.Value;
+        }
+
+        if (request.RemoveData.HasValue)
+        {
+            options.RemoveDataOnUninstall = request.RemoveData.Value;
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Architecture))
+        {
+            options.Architecture = request.Architecture;
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.InstallLocation))
+        {
+            options.CustomInstallLocation = request.InstallLocation;
+        }
     }
 
     internal static void ApplyRequestedOptions(
@@ -385,7 +491,8 @@ public static class AutomationPackageApi
     internal static AutomationPackageOperationResult CreateOperationResult(
         string command,
         IPackage package,
-        AbstractOperation operation
+        AbstractOperation operation,
+        string? outputPath = null
     )
     {
         return new AutomationPackageOperationResult
@@ -400,6 +507,7 @@ public static class AutomationPackageApi
                 _ => operation.GetOutput().LastOrDefault().Item1,
             },
             Package = ToAutomationPackageInfo(package),
+            OutputPath = outputPath,
             Output = operation.GetOutput().Select(line => line.Item1).ToArray(),
         };
     }

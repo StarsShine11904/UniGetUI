@@ -409,6 +409,14 @@ public static class AutomationCliCommandRunner
                     output,
                     await client.InstallPackageAsync(BuildPackageActionRequest(args))
                 ),
+                "download-package" => await WriteJsonAsync(
+                    output,
+                    await client.DownloadPackageAsync(BuildPackageActionRequest(args))
+                ),
+                "reinstall-package" => await WriteJsonAsync(
+                    output,
+                    await client.ReinstallPackageAsync(BuildPackageActionRequest(args))
+                ),
                 "update-package" => await WriteJsonAsync(
                     output,
                     await client.UpdatePackageAsync(BuildPackageActionRequest(args))
@@ -416,6 +424,10 @@ public static class AutomationCliCommandRunner
                 "uninstall-package" => await WriteJsonAsync(
                     output,
                     await client.UninstallPackageAsync(BuildPackageActionRequest(args))
+                ),
+                "uninstall-then-reinstall-package" => await WriteJsonAsync(
+                    output,
+                    await client.UninstallThenReinstallPackageAsync(BuildPackageActionRequest(args))
                 ),
                 "open-window" => await WriteJsonAsync(output, await client.OpenWindowAsync()),
                 "open-updates" => await WriteJsonAsync(output, await client.OpenUpdatesAsync()),
@@ -493,6 +505,13 @@ public static class AutomationCliCommandRunner
             Version = GetOptionalArgument(args, "--version"),
             Scope = GetOptionalArgument(args, "--scope"),
             PreRelease = args.Contains("--pre-release") ? true : null,
+            Elevated = GetOptionalBoolArgument(args, "--elevated"),
+            Interactive = GetOptionalBoolArgument(args, "--interactive"),
+            SkipHash = GetOptionalBoolArgument(args, "--skip-hash"),
+            RemoveData = GetOptionalBoolArgument(args, "--remove-data"),
+            Architecture = GetOptionalArgument(args, "--architecture"),
+            InstallLocation = GetOptionalArgument(args, "--location"),
+            OutputPath = GetOptionalArgument(args, "--output"),
         };
     }
 

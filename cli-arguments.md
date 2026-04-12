@@ -67,7 +67,9 @@
 | `--automation search-packages --manager name --query text [--max-results n]` | Searches packages through the automation service and returns structured JSON | 2026.1+ |
 | `--automation package-details --manager name --package-id id` | Fetches the package-details payload currently exposed through the automation layer | 2026.1+ |
 | `--automation package-versions --manager name --package-id id` | Lists installable versions for a package when the manager supports custom versions | 2026.1+ |
-| `--automation install-package --manager name --package-id id [--version v] [--scope scope] [--pre-release]` | Installs a package through the automation service and waits for completion | 2026.1+ |
+| `--automation install-package --manager name --package-id id [--version v] [--scope scope] [--pre-release] [--elevated true\|false] [--interactive true\|false] [--skip-hash true\|false] [--architecture value] [--location path]` | Installs a package through the automation service and waits for completion, honoring the same core install options exposed by the UI | 2026.1+ |
+| `--automation download-package --manager name --package-id id --output path` | Downloads a package installer or artifact to the specified file or directory and returns the resolved saved path | 2026.1+ |
+| `--automation reinstall-package --manager name --package-id id [--version v] [--scope scope] [--pre-release] [--elevated true\|false] [--interactive true\|false] [--skip-hash true\|false] [--architecture value] [--location path]` | Re-runs package installation for an installed package using the requested install options | 2026.1+ |
 | `--automation open-window` | Asks the running UniGetUI instance to show the main window | 2026.1+ |
 | `--automation open-updates` | Asks the running UniGetUI instance to show the Updates page | 2026.1+ |
 | `--automation show-package --package-id id --package-source source` | Opens the package details flow for the specified package | 2026.1+ |
@@ -76,8 +78,9 @@
 | `--automation unignore-package --manager name --package-id id [--version v]` | Removes an ignored-update rule for a package and refreshes the updates view | 2026.1+ |
 | `--automation update-all` | Queues updates for all packages currently shown as upgradable | 2026.1+ |
 | `--automation update-manager --manager name` | Queues updates for all packages handled by the specified manager | 2026.1+ |
-| `--automation update-package --manager name --package-id id [--version v]` | Updates a specific package through the automation service and waits for completion | 2026.1+ |
-| `--automation uninstall-package --manager name --package-id id [--scope scope]` | Uninstalls a package through the automation service and waits for completion | 2026.1+ |
+| `--automation update-package --manager name --package-id id [--version v] [--scope scope] [--pre-release] [--elevated true\|false] [--interactive true\|false] [--skip-hash true\|false] [--architecture value] [--location path]` | Updates a specific package through the automation service and waits for completion | 2026.1+ |
+| `--automation uninstall-package --manager name --package-id id [--scope scope] [--remove-data true\|false] [--elevated true\|false] [--interactive true\|false]` | Uninstalls a package through the automation service and waits for completion | 2026.1+ |
+| `--automation uninstall-then-reinstall-package --manager name --package-id id [--version v] [--scope scope] [--pre-release] [--remove-data true\|false] [--elevated true\|false] [--interactive true\|false] [--skip-hash true\|false] [--architecture value] [--location path]` | Uninstalls an installed package and then immediately reinstalls it through the shared operation pipeline | 2026.1+ |
 | `--background-api-transport {tcp\|named-pipe}` | Selects which local HTTP transport UniGetUI uses for the background API when the app starts | 2026.1+ |
 | `--background-api-port port` | Overrides the localhost TCP port used by the background API when `--background-api-transport tcp` is active | 2026.1+ |
 | `--background-api-pipe-name name` | Overrides the Windows named pipe name used by the background API when `--background-api-transport named-pipe` is active | 2026.1+ |

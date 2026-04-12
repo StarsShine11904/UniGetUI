@@ -133,9 +133,15 @@ namespace UniGetUI.Interface
                         endpoints.MapGet("/v3/packages/ignored", V3_ListIgnoredUpdates);
                         endpoints.MapPost("/v3/packages/ignore", V3_IgnorePackage);
                         endpoints.MapPost("/v3/packages/unignore", V3_UnignorePackage);
+                        endpoints.MapPost("/v3/packages/download", V3_DownloadPackage);
                         endpoints.MapPost("/v3/packages/install", V3_InstallPackage);
+                        endpoints.MapPost("/v3/packages/reinstall", V3_ReinstallPackage);
                         endpoints.MapPost("/v3/packages/update", V3_UpdatePackage);
                         endpoints.MapPost("/v3/packages/uninstall", V3_UninstallPackage);
+                        endpoints.MapPost(
+                            "/v3/packages/uninstall-then-reinstall",
+                            V3_UninstallThenReinstallPackage
+                        );
                         // Share endpoints
                         endpoints.MapGet("/v2/show-package", V2_ShowPackage);
                         endpoints.MapGet("/is-running", API_IsRunning);
@@ -1308,6 +1314,22 @@ namespace UniGetUI.Interface
             );
         }
 
+        private async Task V3_DownloadPackage(HttpContext context)
+        {
+            await HandlePackageActionAsync(
+                context,
+                AutomationPackageApi.DownloadPackageAsync
+            );
+        }
+
+        private async Task V3_ReinstallPackage(HttpContext context)
+        {
+            await HandlePackageActionAsync(
+                context,
+                AutomationPackageApi.ReinstallPackageAsync
+            );
+        }
+
         private async Task V3_UpdatePackage(HttpContext context)
         {
             await HandlePackageActionAsync(
@@ -1321,6 +1343,14 @@ namespace UniGetUI.Interface
             await HandlePackageActionAsync(
                 context,
                 AutomationPackageApi.UninstallPackageAsync
+            );
+        }
+
+        private async Task V3_UninstallThenReinstallPackage(HttpContext context)
+        {
+            await HandlePackageActionAsync(
+                context,
+                AutomationPackageApi.UninstallThenReinstallPackageAsync
             );
         }
 
@@ -1550,6 +1580,21 @@ namespace UniGetUI.Interface
                 PreRelease = bool.TryParse(request.Query["preRelease"], out bool preRelease)
                     ? preRelease
                     : null,
+                Elevated = bool.TryParse(request.Query["elevated"], out bool elevated)
+                    ? elevated
+                    : null,
+                Interactive = bool.TryParse(request.Query["interactive"], out bool interactive)
+                    ? interactive
+                    : null,
+                SkipHash = bool.TryParse(request.Query["skipHash"], out bool skipHash)
+                    ? skipHash
+                    : null,
+                RemoveData = bool.TryParse(request.Query["removeData"], out bool removeData)
+                    ? removeData
+                    : null,
+                Architecture = request.Query["architecture"],
+                InstallLocation = request.Query["location"],
+                OutputPath = request.Query["outputPath"],
             };
         }
 

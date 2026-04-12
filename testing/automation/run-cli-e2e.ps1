@@ -25,6 +25,8 @@ $cliProject = (Resolve-Path $cliProject).Path
 
 $daemonRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("unigetui-headless-" + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $daemonRoot | Out-Null
+$downloadRoot = Join-Path $daemonRoot 'downloads'
+New-Item -ItemType Directory -Path $downloadRoot | Out-Null
 
 $env:HOME = $daemonRoot
 $env:USERPROFILE = $daemonRoot
@@ -334,6 +336,19 @@ try {
     $versions = Invoke-CliJson -Arguments @('package-versions', '--manager', '.NET Tool', '--package-id', 'dotnetsay')
     if (@($versions.versions | Where-Object { $_ -eq '2.1.4' }).Count -eq 0) {
         throw "package-versions did not report version 2.1.4 for dotnetsay"
+    }
+
+    $download = Invoke-CliJson -Arguments @(
+        'download-package',
+        '--manager', '.NET Tool',
+        '--package-id', 'dotnetsay',
+        '--output', $downloadRoot
+    )
+    if ($download.status -ne 'success' -or [string]::IsNullOrWhiteSpace($download.outputPath)) {
+        throw "download-package failed: $($download | ConvertTo-Json -Depth 8)"
+    }
+    if (-not (Test-Path $download.outputPath)) {
+        throw "download-package did not create the downloaded file at $($download.outputPath)"
     }
 
     Write-Stage 'Bundle roundtrip'
