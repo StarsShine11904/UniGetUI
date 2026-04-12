@@ -4,6 +4,7 @@ using UniGetUI.PackageEngine.Enums;
 using UniGetUI.PackageEngine.Interfaces;
 using UniGetUI.PackageEngine.PackageLoader;
 using UniGetUI.PackageEngine.PackageClasses;
+using UniGetUI.PackageEngine.Classes.Packages.Classes;
 using UniGetUI.PackageEngine.Operations;
 using UniGetUI.PackageEngine.Serializable;
 using UniGetUI.PackageOperations;
@@ -39,6 +40,55 @@ public sealed class AutomationPackageOperationResult
     public string? Message { get; set; }
     public AutomationPackageInfo? Package { get; set; }
     public IReadOnlyList<string> Output { get; set; } = [];
+}
+
+public sealed class AutomationPackageDependencyInfo
+{
+    public string Name { get; set; } = "";
+    public string Version { get; set; } = "";
+    public bool Mandatory { get; set; }
+}
+
+public sealed class AutomationPackageDetailsInfo
+{
+    public string Name { get; set; } = "";
+    public string Id { get; set; } = "";
+    public string Version { get; set; } = "";
+    public string NewVersion { get; set; } = "";
+    public string Source { get; set; } = "";
+    public string Manager { get; set; } = "";
+    public string Description { get; set; } = "";
+    public string Publisher { get; set; } = "";
+    public string Author { get; set; } = "";
+    public string HomepageUrl { get; set; } = "";
+    public string License { get; set; } = "";
+    public string LicenseUrl { get; set; } = "";
+    public string InstallerUrl { get; set; } = "";
+    public string InstallerHash { get; set; } = "";
+    public string InstallerType { get; set; } = "";
+    public long InstallerSize { get; set; }
+    public string ManifestUrl { get; set; } = "";
+    public string UpdateDate { get; set; } = "";
+    public string ReleaseNotes { get; set; } = "";
+    public string ReleaseNotesUrl { get; set; } = "";
+    public string IconUrl { get; set; } = "";
+    public string InstallLocation { get; set; } = "";
+    public string? IgnoredVersion { get; set; }
+    public IReadOnlyList<string> Tags { get; set; } = [];
+    public IReadOnlyList<string> Versions { get; set; } = [];
+    public IReadOnlyList<string> Screenshots { get; set; } = [];
+    public IReadOnlyList<AutomationPackageDependencyInfo> Dependencies { get; set; } = [];
+}
+
+public sealed class AutomationIgnoredUpdateInfo
+{
+    public string IgnoredId { get; set; } = "";
+    public string Manager { get; set; } = "";
+    public string PackageId { get; set; } = "";
+    public string Version { get; set; } = "";
+    public bool IgnoreAllVersions { get; set; }
+    public bool IsPauseUntilDate { get; set; }
+    public string PauseUntil { get; set; } = "";
 }
 
 public static class AutomationPackageApi
@@ -128,6 +178,134 @@ public static class AutomationPackageApi
         );
     }
 
+    public static async Task<AutomationPackageDetailsInfo> GetPackageDetailsAsync(
+        AutomationPackageActionRequest request
+    )
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var package = FindAnyPackage(request);
+        await package.Details.Load();
+
+        return new AutomationPackageDetailsInfo
+        {
+            Name = package.Name,
+            Id = package.Id,
+            Version = package.VersionString,
+            NewVersion = package.IsUpgradable ? package.NewVersionString : "",
+            Source = package.Source.AsString_DisplayName,
+            Manager = package.Manager.Name,
+            Description = package.Details.Description ?? "",
+            Publisher = package.Details.Publisher ?? "",
+            Author = package.Details.Author ?? "",
+            HomepageUrl = package.Details.HomepageUrl?.ToString() ?? "",
+            License = package.Details.License ?? "",
+            LicenseUrl = package.Details.LicenseUrl?.ToString() ?? "",
+            InstallerUrl = package.Details.InstallerUrl?.ToString() ?? "",
+            InstallerHash = package.Details.InstallerHash ?? "",
+            InstallerType = package.Details.InstallerType ?? "",
+            InstallerSize = package.Details.InstallerSize,
+            ManifestUrl = package.Details.ManifestUrl?.ToString() ?? "",
+            UpdateDate = package.Details.UpdateDate ?? "",
+            ReleaseNotes = package.Details.ReleaseNotes ?? "",
+            ReleaseNotesUrl = package.Details.ReleaseNotesUrl?.ToString() ?? "",
+            IconUrl = package.GetIconUrl().ToString(),
+            InstallLocation = package.Manager.DetailsHelper.GetInstallLocation(package) ?? "",
+            IgnoredVersion = await package.GetIgnoredUpdatesVersionAsync(),
+            Tags = package.Details.Tags.Where(tag => !string.IsNullOrWhiteSpace(tag)).ToArray(),
+            Versions = package.Manager.DetailsHelper.GetVersions(package),
+            Screenshots = package
+                .GetScreenshots()
+                .Select(screenshot => screenshot.ToString())
+                .ToArray(),
+            Dependencies = package.Details.Dependencies
+                .Select(dependency => new AutomationPackageDependencyInfo
+                {
+                    Name = dependency.Name,
+                    Version = dependency.Version,
+                    Mandatory = dependency.Mandatory,
+                })
+                .ToArray(),
+        };
+    }
+
+    public static IReadOnlyList<string> GetPackageVersions(AutomationPackageActionRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var package = FindAnyPackage(request);
+        return package.Manager.DetailsHelper.GetVersions(package);
+    }
+
+    public static IReadOnlyList<AutomationIgnoredUpdateInfo> ListIgnoredUpdates()
+    {
+        return IgnoredUpdatesDatabase.GetDatabase()
+            .Select(entry =>
+            {
+                string[] parts = entry.Key.Split('\\', 2);
+                string version = entry.Value;
+
+                return new AutomationIgnoredUpdateInfo
+                {
+                    IgnoredId = entry.Key,
+                    Manager = parts.Length > 0 ? parts[0] : "",
+                    PackageId = parts.Length > 1 ? parts[1] : "",
+                    Version = version,
+                    IgnoreAllVersions = version == "*",
+                    IsPauseUntilDate = version.StartsWith("<", StringComparison.Ordinal),
+                    PauseUntil = version.StartsWith("<", StringComparison.Ordinal)
+                        ? version[1..]
+                        : "",
+                };
+            })
+            .OrderBy(entry => entry.Manager, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(entry => entry.PackageId, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    public static async Task<BackgroundApiCommandResult> IgnorePackageUpdateAsync(
+        AutomationPackageActionRequest request
+    )
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var package = FindPackageForStateMutation(request);
+        await package.AddToIgnoredUpdatesAsync(
+            string.IsNullOrWhiteSpace(request.Version) ? "*" : request.Version
+        );
+        await RefreshUpgradablePackagesSnapshotAsync();
+
+        return new BackgroundApiCommandResult
+        {
+            Command = "ignore-package",
+            Message = $"Ignored updates for {package.Id}.",
+        };
+    }
+
+    public static async Task<BackgroundApiCommandResult> RemoveIgnoredUpdateAsync(
+        AutomationPackageActionRequest request
+    )
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var package = TryFindPackageForStateMutation(request);
+        if (package is not null)
+        {
+            await package.RemoveFromIgnoredUpdatesAsync();
+        }
+        else
+        {
+            var manager = GetManagers(request.ManagerName).FirstOrDefault()
+                ?? throw new InvalidOperationException(
+                    "The manager parameter is required when removing an ignored update for a package that is not currently discoverable."
+                );
+            IgnoredUpdatesDatabase.Remove($"{manager.Properties.Name.ToLowerInvariant()}\\{request.PackageId}");
+        }
+
+        await RefreshUpgradablePackagesSnapshotAsync();
+        return BackgroundApiCommandResult.Success("unignore-package");
+    }
+
     private static async Task<AutomationPackageOperationResult> ExecuteOperationAsync(
         string command,
         IPackage package,
@@ -196,6 +374,12 @@ public static class AutomationPackageApi
         );
     }
 
+    private static IPackage FindAnyPackage(AutomationPackageActionRequest request)
+    {
+        return TryFindPackageForStateMutation(request)
+            ?? FindSearchResult(request);
+    }
+
     private static IPackage FindInstalledPackage(AutomationPackageActionRequest request)
     {
         var package = GetInstalledPackagesSnapshot(request.ManagerName).FirstOrDefault(candidate =>
@@ -240,6 +424,26 @@ public static class AutomationPackageApi
         }
     }
 
+    private static IPackage FindPackageForStateMutation(AutomationPackageActionRequest request)
+    {
+        return TryFindPackageForStateMutation(request)
+            ?? throw new InvalidOperationException(
+                $"No package matching id \"{request.PackageId}\" was found."
+            );
+    }
+
+    private static IPackage? TryFindPackageForStateMutation(AutomationPackageActionRequest request)
+    {
+        try
+        {
+            return FindUpgradablePackageOrInstalledPackage(request);
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
+    }
+
     private static IReadOnlyList<IPackage> GetInstalledPackagesSnapshot(string? managerName)
     {
         var loaderPackages = GetLoaderPackages(
@@ -253,6 +457,16 @@ public static class AutomationPackageApi
         }
 
         return GetManagers(managerName).SelectMany(manager => manager.GetInstalledPackages()).ToArray();
+    }
+
+    private static async Task RefreshUpgradablePackagesSnapshotAsync()
+    {
+        if (UpgradablePackagesLoader.Instance is null || UpgradablePackagesLoader.Instance.IsLoading)
+        {
+            return;
+        }
+
+        await UpgradablePackagesLoader.Instance.ReloadPackages();
     }
 
     private static IReadOnlyList<IPackage> GetUpgradablePackagesSnapshot(string? managerName)

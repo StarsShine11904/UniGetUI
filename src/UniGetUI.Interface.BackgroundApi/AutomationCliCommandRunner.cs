@@ -41,6 +41,78 @@ public static class AutomationCliCommandRunner
             return subcommand switch
             {
                 "status" => await WriteJsonAsync(output, await client.GetStatusAsync()),
+                "list-managers" => await WriteJsonAsync(
+                    output,
+                    new
+                    {
+                        status = "success",
+                        managers = await client.ListManagersAsync(),
+                    }
+                ),
+                "list-sources" => await WriteJsonAsync(
+                    output,
+                    new
+                    {
+                        status = "success",
+                        sources = await client.ListSourcesAsync(GetOptionalArgument(args, "--manager")),
+                    }
+                ),
+                "add-source" => await WriteJsonAsync(
+                    output,
+                    await client.AddSourceAsync(BuildSourceRequest(args))
+                ),
+                "remove-source" => await WriteJsonAsync(
+                    output,
+                    await client.RemoveSourceAsync(BuildSourceRequest(args))
+                ),
+                "list-settings" => await WriteJsonAsync(
+                    output,
+                    new
+                    {
+                        status = "success",
+                        settings = await client.ListSettingsAsync(),
+                    }
+                ),
+                "get-setting" => await WriteJsonAsync(
+                    output,
+                    new
+                    {
+                        status = "success",
+                        setting = await client.GetSettingAsync(
+                            GetRequiredArgument(
+                                args,
+                                "--key",
+                                "The get-setting automation command requires --key."
+                            )
+                        ),
+                    }
+                ),
+                "set-setting" => await WriteJsonAsync(
+                    output,
+                    new
+                    {
+                        status = "success",
+                        setting = await client.SetSettingAsync(BuildSettingRequest(args)),
+                    }
+                ),
+                "clear-setting" => await WriteJsonAsync(
+                    output,
+                    new
+                    {
+                        status = "success",
+                        setting = await client.ClearSettingAsync(
+                            GetRequiredArgument(
+                                args,
+                                "--key",
+                                "The clear-setting automation command requires --key."
+                            )
+                        ),
+                    }
+                ),
+                "reset-settings" => await WriteJsonAsync(
+                    output,
+                    await client.ResetSettingsAsync()
+                ),
                 "get-version" => await WriteJsonAsync(
                     output,
                     new
@@ -84,6 +156,38 @@ public static class AutomationCliCommandRunner
                             GetOptionalIntArgument(args, "--max-results")
                         ),
                     }
+                ),
+                "package-details" => await WriteJsonAsync(
+                    output,
+                    new
+                    {
+                        status = "success",
+                        package = await client.GetPackageDetailsAsync(BuildPackageActionRequest(args)),
+                    }
+                ),
+                "package-versions" => await WriteJsonAsync(
+                    output,
+                    new
+                    {
+                        status = "success",
+                        versions = await client.GetPackageVersionsAsync(BuildPackageActionRequest(args)),
+                    }
+                ),
+                "list-ignored-updates" => await WriteJsonAsync(
+                    output,
+                    new
+                    {
+                        status = "success",
+                        ignoredUpdates = await client.ListIgnoredUpdatesAsync(),
+                    }
+                ),
+                "ignore-package" => await WriteJsonAsync(
+                    output,
+                    await client.IgnorePackageUpdateAsync(BuildPackageActionRequest(args))
+                ),
+                "unignore-package" => await WriteJsonAsync(
+                    output,
+                    await client.RemoveIgnoredUpdateAsync(BuildPackageActionRequest(args))
                 ),
                 "install-package" => await WriteJsonAsync(
                     output,
@@ -173,6 +277,52 @@ public static class AutomationCliCommandRunner
             Version = GetOptionalArgument(args, "--version"),
             Scope = GetOptionalArgument(args, "--scope"),
             PreRelease = args.Contains("--pre-release") ? true : null,
+        };
+    }
+
+    private static AutomationSourceRequest BuildSourceRequest(IReadOnlyList<string> args)
+    {
+        return new AutomationSourceRequest
+        {
+            ManagerName = GetRequiredArgument(
+                args,
+                "--manager",
+                "This automation command requires --manager."
+            ),
+            SourceName = GetRequiredArgument(
+                args,
+                "--name",
+                "This automation command requires --name."
+            ),
+            SourceUrl = GetOptionalArgument(args, "--url"),
+        };
+    }
+
+    private static AutomationSettingValueRequest BuildSettingRequest(IReadOnlyList<string> args)
+    {
+        bool? enabled = null;
+        string? enabledValue = GetOptionalArgument(args, "--enabled");
+        if (enabledValue is not null)
+        {
+            if (!bool.TryParse(enabledValue, out bool parsedEnabled))
+            {
+                throw new InvalidOperationException(
+                    "The value supplied to --enabled must be either true or false."
+                );
+            }
+
+            enabled = parsedEnabled;
+        }
+
+        return new AutomationSettingValueRequest
+        {
+            SettingKey = GetRequiredArgument(
+                args,
+                "--key",
+                "This automation command requires --key."
+            ),
+            Enabled = enabled,
+            Value = GetOptionalArgument(args, "--value"),
         };
     }
 

@@ -1,6 +1,10 @@
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
+$runningOnWindows = [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform(
+    [System.Runtime.InteropServices.OSPlatform]::Windows
+)
+
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $srcRoot = Join-Path $repoRoot 'src'
 $configuration = if ($env:CONFIGURATION) { $env:CONFIGURATION } else { 'Release' }
@@ -29,7 +33,7 @@ $env:DOTNET_CLI_HOME = $daemonRoot
 $transportArgs = @()
 $daemonArgs = @('run', '--project', $daemonProject, '--configuration', $configuration, '--no-build', '--', '--headless')
 
-if ($IsWindows) {
+if ($runningOnWindows) {
     $pipeName = "UniGetUI.CI.$([Guid]::NewGuid().ToString('N'))"
     $transportArgs += @('--transport', 'named-pipe', '--pipe-name', $pipeName)
     $daemonArgs += @('--background-api-transport', 'named-pipe', '--background-api-pipe-name', $pipeName)
@@ -125,10 +129,50 @@ try {
         throw "Headless daemon never became ready.`n$daemonOutput"
     }
 
+    $managers = Invoke-CliJson -Arguments @('list-managers')
+    if (@($managers.managers | Where-Object { $_.name -eq '.NET Tool' }).Count -eq 0) {
+        throw "list-managers did not report the .NET Tool manager"
+    }
+
+    $sources = Invoke-CliJson -Arguments @('list-sources', '--manager', '.NET Tool')
+    if (@($sources.sources | Where-Object { $_.name -eq 'nuget.org' }).Count -eq 0) {
+        throw "list-sources did not report nuget.org for .NET Tool"
+    }
+
+    $settings = Invoke-CliJson -Arguments @('list-settings')
+    if (@($settings.settings | Where-Object { $_.name -eq 'FreshValue' }).Count -eq 0) {
+        throw "list-settings did not report FreshValue"
+    }
+
+    $setFreshValue = Invoke-CliJson -Arguments @('set-setting', '--key', 'FreshValue', '--value', 'cli-smoke')
+    if ($setFreshValue.setting.stringValue -ne 'cli-smoke') {
+        throw "set-setting did not persist FreshValue"
+    }
+
+    $getFreshValue = Invoke-CliJson -Arguments @('get-setting', '--key', 'FreshValue')
+    if ($getFreshValue.setting.stringValue -ne 'cli-smoke') {
+        throw "get-setting did not return the FreshValue payload"
+    }
+
+    $setFreshBool = Invoke-CliJson -Arguments @('set-setting', '--key', 'FreshBoolSetting', '--enabled', 'true')
+    if (-not $setFreshBool.setting.boolValue) {
+        throw "set-setting did not enable FreshBoolSetting"
+    }
+
     $search = Invoke-CliJson -Arguments @('search-packages', '--manager', '.NET Tool', '--query', 'dotnetsay', '--max-results', '20')
     $searchMatch = @($search.packages | Where-Object { $_.id -eq 'dotnetsay' })
     if ($searchMatch.Count -eq 0) {
         throw "search-packages did not return dotnetsay"
+    }
+
+    $details = Invoke-CliJson -Arguments @('package-details', '--manager', '.NET Tool', '--package-id', 'dotnetsay')
+    if ($details.package.id -ne 'dotnetsay') {
+        throw "package-details did not return dotnetsay"
+    }
+
+    $versions = Invoke-CliJson -Arguments @('package-versions', '--manager', '.NET Tool', '--package-id', 'dotnetsay')
+    if (@($versions.versions | Where-Object { $_ -eq '2.1.4' }).Count -eq 0) {
+        throw "package-versions did not report version 2.1.4 for dotnetsay"
     }
 
     $install = Invoke-CliJson -Arguments @('install-package', '--manager', '.NET Tool', '--package-id', 'dotnetsay', '--version', '2.1.4', '--scope', 'Global')
@@ -153,6 +197,26 @@ try {
             @($response.packages | Where-Object { $_.id -eq 'dotnetsay' -and $_.version -eq '2.1.4' }).Count -gt 0
         }
     $installedDotnetsay = @($installed.packages | Where-Object { $_.id -eq 'dotnetsay' })
+
+    $ignore = Invoke-CliJson -Arguments @('ignore-package', '--manager', '.NET Tool', '--package-id', 'dotnetsay')
+    if ($ignore.status -ne 'success') {
+        throw "ignore-package failed: $($ignore | ConvertTo-Json -Depth 8)"
+    }
+
+    $ignoredUpdates = Invoke-CliJson -Arguments @('list-ignored-updates')
+    if (@($ignoredUpdates.ignoredUpdates | Where-Object { $_.packageId -eq 'dotnetsay' }).Count -eq 0) {
+        throw "list-ignored-updates did not report dotnetsay after ignore-package"
+    }
+
+    $unignore = Invoke-CliJson -Arguments @('unignore-package', '--manager', '.NET Tool', '--package-id', 'dotnetsay')
+    if ($unignore.status -ne 'success') {
+        throw "unignore-package failed: $($unignore | ConvertTo-Json -Depth 8)"
+    }
+
+    $ignoredUpdates = Invoke-CliJson -Arguments @('list-ignored-updates')
+    if (@($ignoredUpdates.ignoredUpdates | Where-Object { $_.packageId -eq 'dotnetsay' }).Count -ne 0) {
+        throw "unignore-package did not remove dotnetsay from ignored updates"
+    }
 
     $update = Invoke-CliJson -Arguments @('update-package', '--manager', '.NET Tool', '--package-id', 'dotnetsay')
     if ($update.status -ne 'success') {
@@ -181,6 +245,16 @@ try {
             @($response.packages | Where-Object { $_.id -eq 'dotnetsay' }).Count -eq 0
         }
     $remainingDotnetsay = @($installedAfterUninstall.packages | Where-Object { $_.id -eq 'dotnetsay' })
+
+    $clearFreshValue = Invoke-CliJson -Arguments @('clear-setting', '--key', 'FreshValue')
+    if ($clearFreshValue.setting.isSet) {
+        throw "clear-setting did not clear FreshValue"
+    }
+
+    $disableFreshBool = Invoke-CliJson -Arguments @('set-setting', '--key', 'FreshBoolSetting', '--enabled', 'false')
+    if ($disableFreshBool.setting.boolValue) {
+        throw "set-setting did not disable FreshBoolSetting"
+    }
 }
 finally {
     Stop-Daemon

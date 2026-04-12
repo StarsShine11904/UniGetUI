@@ -63,6 +63,98 @@ public sealed class BackgroundApiClient : IDisposable
         };
     }
 
+    public async Task<IReadOnlyList<AutomationManagerInfo>> ListManagersAsync()
+    {
+        return await ReadAuthenticatedJsonAsync<IReadOnlyList<AutomationManagerInfo>>(
+            HttpMethod.Get,
+            "/v3/managers"
+        ) ?? [];
+    }
+
+    public async Task<IReadOnlyList<AutomationSourceInfo>> ListSourcesAsync(string? managerName = null)
+    {
+        Dictionary<string, string>? parameters = null;
+        if (!string.IsNullOrWhiteSpace(managerName))
+        {
+            parameters = new Dictionary<string, string> { ["manager"] = managerName };
+        }
+
+        return await ReadAuthenticatedJsonAsync<IReadOnlyList<AutomationSourceInfo>>(
+            HttpMethod.Get,
+            "/v3/sources",
+            parameters
+        ) ?? [];
+    }
+
+    public async Task<AutomationSourceOperationResult> AddSourceAsync(AutomationSourceRequest request)
+    {
+        return await SendSourceOperationAsync("/v3/sources/add", request);
+    }
+
+    public async Task<AutomationSourceOperationResult> RemoveSourceAsync(AutomationSourceRequest request)
+    {
+        return await SendSourceOperationAsync("/v3/sources/remove", request);
+    }
+
+    public async Task<IReadOnlyList<AutomationSettingInfo>> ListSettingsAsync()
+    {
+        return await ReadAuthenticatedJsonAsync<IReadOnlyList<AutomationSettingInfo>>(
+            HttpMethod.Get,
+            "/v3/settings"
+        ) ?? [];
+    }
+
+    public async Task<AutomationSettingInfo?> GetSettingAsync(string key)
+    {
+        return await ReadAuthenticatedJsonAsync<AutomationSettingInfo>(
+            HttpMethod.Get,
+            "/v3/settings/item",
+            new Dictionary<string, string> { ["key"] = key }
+        );
+    }
+
+    public async Task<AutomationSettingInfo?> SetSettingAsync(AutomationSettingValueRequest request)
+    {
+        Dictionary<string, string> parameters = new() { ["key"] = request.SettingKey };
+        if (request.Enabled.HasValue)
+        {
+            parameters["enabled"] = request.Enabled.Value ? "true" : "false";
+        }
+
+        if (request.Value is not null)
+        {
+            parameters["value"] = request.Value;
+        }
+
+        return await ReadAuthenticatedJsonAsync<AutomationSettingInfo>(
+            HttpMethod.Post,
+            "/v3/settings/set",
+            parameters
+        );
+    }
+
+    public async Task<AutomationSettingInfo?> ClearSettingAsync(string key)
+    {
+        return await ReadAuthenticatedJsonAsync<AutomationSettingInfo>(
+            HttpMethod.Post,
+            "/v3/settings/clear",
+            new Dictionary<string, string> { ["key"] = key }
+        );
+    }
+
+    public async Task<BackgroundApiCommandResult> ResetSettingsAsync()
+    {
+        return await ReadAuthenticatedJsonAsync<BackgroundApiCommandResult>(
+                HttpMethod.Post,
+                "/v3/settings/reset"
+            )
+            ?? new BackgroundApiCommandResult
+            {
+                Status = "error",
+                Message = "The background API returned an empty response.",
+            };
+    }
+
     public async Task<BackgroundApiCommandResult> OpenWindowAsync()
     {
         await SendAuthenticatedGetAsync("/widgets/v1/open_wingetui");
@@ -159,6 +251,50 @@ public sealed class BackgroundApiClient : IDisposable
             "/v3/packages/updates",
             parameters
         ) ?? [];
+    }
+
+    public async Task<AutomationPackageDetailsInfo?> GetPackageDetailsAsync(
+        AutomationPackageActionRequest request
+    )
+    {
+        return await ReadAuthenticatedJsonAsync<AutomationPackageDetailsInfo>(
+            HttpMethod.Get,
+            "/v3/packages/details",
+            BuildPackageQueryParameters(request)
+        );
+    }
+
+    public async Task<IReadOnlyList<string>> GetPackageVersionsAsync(
+        AutomationPackageActionRequest request
+    )
+    {
+        return await ReadAuthenticatedJsonAsync<IReadOnlyList<string>>(
+            HttpMethod.Get,
+            "/v3/packages/versions",
+            BuildPackageQueryParameters(request)
+        ) ?? [];
+    }
+
+    public async Task<IReadOnlyList<AutomationIgnoredUpdateInfo>> ListIgnoredUpdatesAsync()
+    {
+        return await ReadAuthenticatedJsonAsync<IReadOnlyList<AutomationIgnoredUpdateInfo>>(
+            HttpMethod.Get,
+            "/v3/packages/ignored"
+        ) ?? [];
+    }
+
+    public async Task<BackgroundApiCommandResult> IgnorePackageUpdateAsync(
+        AutomationPackageActionRequest request
+    )
+    {
+        return await SendCommandAsync("/v3/packages/ignore", BuildPackageQueryParameters(request));
+    }
+
+    public async Task<BackgroundApiCommandResult> RemoveIgnoredUpdateAsync(
+        AutomationPackageActionRequest request
+    )
+    {
+        return await SendCommandAsync("/v3/packages/unignore", BuildPackageQueryParameters(request));
     }
 
     public async Task<BackgroundApiCommandResult> UpdateAllAsync()
@@ -315,10 +451,68 @@ public sealed class BackgroundApiClient : IDisposable
         AutomationPackageActionRequest request
     )
     {
+        return await ReadAuthenticatedJsonAsync<AutomationPackageOperationResult>(
+                HttpMethod.Post,
+                relativePath,
+                BuildPackageQueryParameters(request)
+            )
+            ?? new AutomationPackageOperationResult
+            {
+                Status = "error",
+                Message = "The background API returned an empty response.",
+            };
+    }
+
+    private async Task<AutomationSourceOperationResult> SendSourceOperationAsync(
+        string relativePath,
+        AutomationSourceRequest request
+    )
+    {
         Dictionary<string, string> parameters = new()
         {
-            ["packageId"] = request.PackageId,
+            ["manager"] = request.ManagerName,
+            ["name"] = request.SourceName,
         };
+
+        if (!string.IsNullOrWhiteSpace(request.SourceUrl))
+        {
+            parameters["url"] = request.SourceUrl;
+        }
+
+        return await ReadAuthenticatedJsonAsync<AutomationSourceOperationResult>(
+                HttpMethod.Post,
+                relativePath,
+                parameters
+            )
+            ?? new AutomationSourceOperationResult
+            {
+                Status = "error",
+                Message = "The background API returned an empty response.",
+            };
+    }
+
+    private async Task<BackgroundApiCommandResult> SendCommandAsync(
+        string relativePath,
+        IReadOnlyDictionary<string, string>? queryParameters = null
+    )
+    {
+        return await ReadAuthenticatedJsonAsync<BackgroundApiCommandResult>(
+                HttpMethod.Post,
+                relativePath,
+                queryParameters
+            )
+            ?? new BackgroundApiCommandResult
+            {
+                Status = "error",
+                Message = "The background API returned an empty response.",
+            };
+    }
+
+    private static Dictionary<string, string> BuildPackageQueryParameters(
+        AutomationPackageActionRequest request
+    )
+    {
+        Dictionary<string, string> parameters = new() { ["packageId"] = request.PackageId };
 
         if (!string.IsNullOrWhiteSpace(request.ManagerName))
         {
@@ -345,16 +539,7 @@ public sealed class BackgroundApiClient : IDisposable
             parameters["preRelease"] = request.PreRelease.Value ? "true" : "false";
         }
 
-        return await ReadAuthenticatedJsonAsync<AutomationPackageOperationResult>(
-                HttpMethod.Post,
-                relativePath,
-                parameters
-            )
-            ?? new AutomationPackageOperationResult
-            {
-                Status = "error",
-                Message = "The background API returned an empty response.",
-            };
+        return parameters;
     }
 
     private static HttpClient CreateHttpClient(BackgroundApiTransportOptions options)
@@ -403,6 +588,21 @@ public sealed class BackgroundApiClient : IDisposable
             return method == HttpMethod.Post
                 ? TimeSpan.FromMinutes(5)
                 : TimeSpan.FromSeconds(30);
+        }
+
+        if (relativePath.StartsWith("/v3/sources/", StringComparison.OrdinalIgnoreCase))
+        {
+            return method == HttpMethod.Post
+                ? TimeSpan.FromMinutes(2)
+                : TimeSpan.FromSeconds(30);
+        }
+
+        if (
+            relativePath.StartsWith("/v3/managers", StringComparison.OrdinalIgnoreCase)
+            || relativePath.StartsWith("/v3/settings", StringComparison.OrdinalIgnoreCase)
+        )
+        {
+            return TimeSpan.FromSeconds(15);
         }
 
         return TimeSpan.FromSeconds(5);

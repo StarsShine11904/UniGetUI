@@ -166,6 +166,56 @@ namespace UniGetUI.PackageEngine.Operations
 #endif
         }
 
+        protected async Task<IPackage> ResolveInstalledPackageSnapshotAsync(string fallbackVersion)
+        {
+            try
+            {
+                var installedMatches = await Task.Run(() =>
+                    Package
+                        .Manager.GetInstalledPackages()
+                        .Where(candidate => candidate.IsEquivalentTo(Package))
+                        .ToArray()
+                );
+
+                if (installedMatches.Length > 0)
+                {
+                    if (!string.IsNullOrWhiteSpace(fallbackVersion))
+                    {
+                        var exactMatch = installedMatches.FirstOrDefault(candidate =>
+                            candidate.VersionString.Equals(
+                                fallbackVersion,
+                                StringComparison.OrdinalIgnoreCase
+                            )
+                        );
+                        if (exactMatch is not null)
+                        {
+                            return exactMatch;
+                        }
+                    }
+
+                    return installedMatches
+                        .OrderByDescending(candidate => candidate.NormalizedVersion)
+                        .First();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn(
+                    $"Could not resolve the installed snapshot for package {Package.Id}; falling back to synthetic state"
+                );
+                Logger.Warn(ex);
+            }
+
+            return new Package(
+                Package.Name,
+                Package.Id,
+                fallbackVersion,
+                Package.Source,
+                Package.Manager,
+                Package.OverridenOptions
+            );
+        }
+
         public override Task<Uri> GetOperationIcon()
         {
             return TaskRecycler<Uri>.RunOrAttachAsync(Package.GetIconUrl);
@@ -262,15 +312,10 @@ namespace UniGetUI.PackageEngine.Operations
         protected override async Task HandleSuccess()
         {
             Package.SetTag(PackageTag.AlreadyInstalled);
-            var copy = new Package(
-                Package.Name,
-                Package.Id,
-                Package.VersionString,
-                Package.Source,
-                Package.Manager,
-                Package.OverridenOptions
+            var installedPackage = await ResolveInstalledPackageSnapshotAsync(
+                string.IsNullOrWhiteSpace(Options.Version) ? Package.VersionString : Options.Version
             );
-            await InstalledPackagesLoader.Instance.AddForeign(copy);
+            await InstalledPackagesLoader.Instance.AddForeign(installedPackage);
 
             if (Settings.Get(Settings.K.AskToDeleteNewDesktopShortcuts))
             {
@@ -343,18 +388,12 @@ namespace UniGetUI.PackageEngine.Operations
             UpgradablePackagesLoader.Instance.Remove(Package);
             InstalledPackagesLoader.Instance.Remove(Package);
 
-            await InstalledPackagesLoader.Instance.AddForeign(
-                new Package(
-                    Package.Name,
-                    Package.Id,
-                    string.IsNullOrWhiteSpace(Package.NewVersionString)
-                        ? Package.VersionString
-                        : Package.NewVersionString,
-                    Package.Source,
-                    Package.Manager,
-                    Package.OverridenOptions
-                )
+            var installedPackage = await ResolveInstalledPackageSnapshotAsync(
+                string.IsNullOrWhiteSpace(Package.NewVersionString)
+                    ? Package.VersionString
+                    : Package.NewVersionString
             );
+            await InstalledPackagesLoader.Instance.AddForeign(installedPackage);
 
             if (Settings.Get(Settings.K.AskToDeleteNewDesktopShortcuts))
             {

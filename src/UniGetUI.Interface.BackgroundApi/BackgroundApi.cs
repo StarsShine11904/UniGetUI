@@ -68,9 +68,23 @@ namespace UniGetUI.Interface
                     app.UseEndpoints(endpoints =>
                     {
                         endpoints.MapGet("/v3/status", V3_Status);
+                        endpoints.MapGet("/v3/managers", V3_ListManagers);
+                        endpoints.MapGet("/v3/sources", V3_ListSources);
+                        endpoints.MapPost("/v3/sources/add", V3_AddSource);
+                        endpoints.MapPost("/v3/sources/remove", V3_RemoveSource);
+                        endpoints.MapGet("/v3/settings", V3_ListSettings);
+                        endpoints.MapGet("/v3/settings/item", V3_GetSetting);
+                        endpoints.MapPost("/v3/settings/set", V3_SetSetting);
+                        endpoints.MapPost("/v3/settings/clear", V3_ClearSetting);
+                        endpoints.MapPost("/v3/settings/reset", V3_ResetSettings);
                         endpoints.MapGet("/v3/packages/search", V3_SearchPackages);
                         endpoints.MapGet("/v3/packages/installed", V3_ListInstalledPackages);
                         endpoints.MapGet("/v3/packages/updates", V3_ListUpgradablePackages);
+                        endpoints.MapGet("/v3/packages/details", V3_GetPackageDetails);
+                        endpoints.MapGet("/v3/packages/versions", V3_GetPackageVersions);
+                        endpoints.MapGet("/v3/packages/ignored", V3_ListIgnoredUpdates);
+                        endpoints.MapPost("/v3/packages/ignore", V3_IgnorePackage);
+                        endpoints.MapPost("/v3/packages/unignore", V3_UnignorePackage);
                         endpoints.MapPost("/v3/packages/install", V3_InstallPackage);
                         endpoints.MapPost("/v3/packages/update", V3_UpdatePackage);
                         endpoints.MapPost("/v3/packages/uninstall", V3_UninstallPackage);
@@ -171,6 +185,202 @@ namespace UniGetUI.Interface
                     Version = CoreData.VersionName,
                     BuildNumber = CoreData.BuildNumber,
                 },
+                new JsonSerializerOptions(SerializationHelpers.DefaultOptions)
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    WriteIndented = true,
+                }
+            );
+        }
+
+        private async Task V3_ListManagers(HttpContext context)
+        {
+            if (!AuthenticateToken(context.Request.Query["token"]))
+            {
+                context.Response.StatusCode = 401;
+                return;
+            }
+
+            await context.Response.WriteAsJsonAsync(
+                AutomationManagerSettingsApi.ListManagers(),
+                new JsonSerializerOptions(SerializationHelpers.DefaultOptions)
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    WriteIndented = true,
+                }
+            );
+        }
+
+        private async Task V3_ListSources(HttpContext context)
+        {
+            if (!AuthenticateToken(context.Request.Query["token"]))
+            {
+                context.Response.StatusCode = 401;
+                return;
+            }
+
+            try
+            {
+                await context.Response.WriteAsJsonAsync(
+                    AutomationManagerSettingsApi.ListSources(context.Request.Query["manager"]),
+                    new JsonSerializerOptions(SerializationHelpers.DefaultOptions)
+                    {
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                        WriteIndented = true,
+                    }
+                );
+            }
+            catch (InvalidOperationException ex)
+            {
+                context.Response.StatusCode = 400;
+                await context.Response.WriteAsync(ex.Message);
+            }
+        }
+
+        private async Task V3_AddSource(HttpContext context)
+        {
+            await HandleSourceActionAsync(context, AutomationManagerSettingsApi.AddSourceAsync);
+        }
+
+        private async Task V3_RemoveSource(HttpContext context)
+        {
+            await HandleSourceActionAsync(context, AutomationManagerSettingsApi.RemoveSourceAsync);
+        }
+
+        private async Task V3_ListSettings(HttpContext context)
+        {
+            if (!AuthenticateToken(context.Request.Query["token"]))
+            {
+                context.Response.StatusCode = 401;
+                return;
+            }
+
+            await context.Response.WriteAsJsonAsync(
+                AutomationManagerSettingsApi.ListSettings(),
+                new JsonSerializerOptions(SerializationHelpers.DefaultOptions)
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    WriteIndented = true,
+                }
+            );
+        }
+
+        private async Task V3_GetSetting(HttpContext context)
+        {
+            if (!AuthenticateToken(context.Request.Query["token"]))
+            {
+                context.Response.StatusCode = 401;
+                return;
+            }
+
+            string key = context.Request.Query["key"].ToString();
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                context.Response.StatusCode = 400;
+                await context.Response.WriteAsync("The key parameter is required.");
+                return;
+            }
+
+            try
+            {
+                await context.Response.WriteAsJsonAsync(
+                    AutomationManagerSettingsApi.GetSetting(key),
+                    new JsonSerializerOptions(SerializationHelpers.DefaultOptions)
+                    {
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                        WriteIndented = true,
+                    }
+                );
+            }
+            catch (InvalidOperationException ex)
+            {
+                context.Response.StatusCode = 400;
+                await context.Response.WriteAsync(ex.Message);
+            }
+        }
+
+        private async Task V3_SetSetting(HttpContext context)
+        {
+            if (!AuthenticateToken(context.Request.Query["token"]))
+            {
+                context.Response.StatusCode = 401;
+                return;
+            }
+
+            try
+            {
+                await context.Response.WriteAsJsonAsync(
+                    AutomationManagerSettingsApi.SetSetting(
+                        new AutomationSettingValueRequest
+                        {
+                            SettingKey = context.Request.Query["key"],
+                            Enabled = bool.TryParse(context.Request.Query["enabled"], out bool enabled)
+                                ? enabled
+                                : null,
+                            Value = context.Request.Query.TryGetValue("value", out var value)
+                                ? value.ToString()
+                                : null,
+                        }
+                    ),
+                    new JsonSerializerOptions(SerializationHelpers.DefaultOptions)
+                    {
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                        WriteIndented = true,
+                    }
+                );
+            }
+            catch (InvalidOperationException ex)
+            {
+                context.Response.StatusCode = 400;
+                await context.Response.WriteAsync(ex.Message);
+            }
+        }
+
+        private async Task V3_ClearSetting(HttpContext context)
+        {
+            if (!AuthenticateToken(context.Request.Query["token"]))
+            {
+                context.Response.StatusCode = 401;
+                return;
+            }
+
+            string key = context.Request.Query["key"].ToString();
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                context.Response.StatusCode = 400;
+                await context.Response.WriteAsync("The key parameter is required.");
+                return;
+            }
+
+            try
+            {
+                await context.Response.WriteAsJsonAsync(
+                    AutomationManagerSettingsApi.ClearSetting(key),
+                    new JsonSerializerOptions(SerializationHelpers.DefaultOptions)
+                    {
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                        WriteIndented = true,
+                    }
+                );
+            }
+            catch (InvalidOperationException ex)
+            {
+                context.Response.StatusCode = 400;
+                await context.Response.WriteAsync(ex.Message);
+            }
+        }
+
+        private async Task V3_ResetSettings(HttpContext context)
+        {
+            if (!AuthenticateToken(context.Request.Query["token"]))
+            {
+                context.Response.StatusCode = 401;
+                return;
+            }
+
+            AutomationManagerSettingsApi.ResetSettingsPreservingSession();
+            await context.Response.WriteAsJsonAsync(
+                BackgroundApiCommandResult.Success("reset-settings"),
                 new JsonSerializerOptions(SerializationHelpers.DefaultOptions)
                 {
                     PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -286,6 +496,104 @@ namespace UniGetUI.Interface
             }
         }
 
+        private async Task V3_GetPackageDetails(HttpContext context)
+        {
+            if (!AuthenticateToken(context.Request.Query["token"]))
+            {
+                context.Response.StatusCode = 401;
+                return;
+            }
+
+            string packageId = context.Request.Query["packageId"].ToString();
+            if (string.IsNullOrWhiteSpace(packageId))
+            {
+                context.Response.StatusCode = 400;
+                await context.Response.WriteAsync("The packageId parameter is required.");
+                return;
+            }
+
+            try
+            {
+                await context.Response.WriteAsJsonAsync(
+                    await AutomationPackageApi.GetPackageDetailsAsync(
+                        BuildPackageActionRequest(context.Request)
+                    ),
+                    new JsonSerializerOptions(SerializationHelpers.DefaultOptions)
+                    {
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                        WriteIndented = true,
+                    }
+                );
+            }
+            catch (InvalidOperationException ex)
+            {
+                context.Response.StatusCode = 400;
+                await context.Response.WriteAsync(ex.Message);
+            }
+        }
+
+        private async Task V3_GetPackageVersions(HttpContext context)
+        {
+            if (!AuthenticateToken(context.Request.Query["token"]))
+            {
+                context.Response.StatusCode = 401;
+                return;
+            }
+
+            string packageId = context.Request.Query["packageId"].ToString();
+            if (string.IsNullOrWhiteSpace(packageId))
+            {
+                context.Response.StatusCode = 400;
+                await context.Response.WriteAsync("The packageId parameter is required.");
+                return;
+            }
+
+            try
+            {
+                await context.Response.WriteAsJsonAsync(
+                    AutomationPackageApi.GetPackageVersions(BuildPackageActionRequest(context.Request)),
+                    new JsonSerializerOptions(SerializationHelpers.DefaultOptions)
+                    {
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                        WriteIndented = true,
+                    }
+                );
+            }
+            catch (InvalidOperationException ex)
+            {
+                context.Response.StatusCode = 400;
+                await context.Response.WriteAsync(ex.Message);
+            }
+        }
+
+        private async Task V3_ListIgnoredUpdates(HttpContext context)
+        {
+            if (!AuthenticateToken(context.Request.Query["token"]))
+            {
+                context.Response.StatusCode = 401;
+                return;
+            }
+
+            await context.Response.WriteAsJsonAsync(
+                AutomationPackageApi.ListIgnoredUpdates(),
+                new JsonSerializerOptions(SerializationHelpers.DefaultOptions)
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    WriteIndented = true,
+                }
+            );
+        }
+
+        private async Task V3_IgnorePackage(HttpContext context)
+        {
+            await HandleCommandActionAsync(context, AutomationPackageApi.IgnorePackageUpdateAsync);
+        }
+
+        private async Task V3_UnignorePackage(HttpContext context)
+        {
+            await HandleCommandActionAsync(context, AutomationPackageApi.RemoveIgnoredUpdateAsync);
+        }
+
         private async Task V3_InstallPackage(HttpContext context)
         {
             await HandlePackageActionAsync(
@@ -331,17 +639,7 @@ namespace UniGetUI.Interface
 
             try
             {
-                var request = new AutomationPackageActionRequest
-                {
-                    PackageId = packageId,
-                    ManagerName = context.Request.Query["manager"],
-                    PackageSource = context.Request.Query["packageSource"],
-                    Version = context.Request.Query["version"],
-                    Scope = context.Request.Query["scope"],
-                    PreRelease = bool.TryParse(context.Request.Query["preRelease"], out bool preRelease)
-                        ? preRelease
-                        : null,
-                };
+                var request = BuildPackageActionRequest(context.Request);
 
                 await context.Response.WriteAsJsonAsync(
                     await action(request),
@@ -357,6 +655,96 @@ namespace UniGetUI.Interface
                 context.Response.StatusCode = 400;
                 await context.Response.WriteAsync(ex.Message);
             }
+        }
+
+        private static async Task HandleCommandActionAsync(
+            HttpContext context,
+            Func<AutomationPackageActionRequest, Task<BackgroundApiCommandResult>> action
+        )
+        {
+            if (!AuthenticateToken(context.Request.Query["token"]))
+            {
+                context.Response.StatusCode = 401;
+                return;
+            }
+
+            string packageId = context.Request.Query["packageId"].ToString();
+            if (string.IsNullOrWhiteSpace(packageId))
+            {
+                context.Response.StatusCode = 400;
+                await context.Response.WriteAsync("The packageId parameter is required.");
+                return;
+            }
+
+            try
+            {
+                await context.Response.WriteAsJsonAsync(
+                    await action(BuildPackageActionRequest(context.Request)),
+                    new JsonSerializerOptions(SerializationHelpers.DefaultOptions)
+                    {
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                        WriteIndented = true,
+                    }
+                );
+            }
+            catch (InvalidOperationException ex)
+            {
+                context.Response.StatusCode = 400;
+                await context.Response.WriteAsync(ex.Message);
+            }
+        }
+
+        private static async Task HandleSourceActionAsync(
+            HttpContext context,
+            Func<AutomationSourceRequest, Task<AutomationSourceOperationResult>> action
+        )
+        {
+            if (!AuthenticateToken(context.Request.Query["token"]))
+            {
+                context.Response.StatusCode = 401;
+                return;
+            }
+
+            try
+            {
+                await context.Response.WriteAsJsonAsync(
+                    await action(
+                        new AutomationSourceRequest
+                        {
+                            ManagerName = context.Request.Query["manager"],
+                            SourceName = context.Request.Query["name"],
+                            SourceUrl = context.Request.Query.TryGetValue("url", out var url)
+                                ? url.ToString()
+                                : null,
+                        }
+                    ),
+                    new JsonSerializerOptions(SerializationHelpers.DefaultOptions)
+                    {
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                        WriteIndented = true,
+                    }
+                );
+            }
+            catch (InvalidOperationException ex)
+            {
+                context.Response.StatusCode = 400;
+                await context.Response.WriteAsync(ex.Message);
+            }
+        }
+
+        private static AutomationPackageActionRequest BuildPackageActionRequest(HttpRequest request)
+        {
+            return new AutomationPackageActionRequest
+            {
+                PackageId = request.Query["packageId"],
+                ManagerName = request.Query["manager"],
+                PackageSource = request.Query["packageSource"],
+                Version = request.Query["version"],
+                Scope = request.Query["scope"],
+                PreRelease = bool.TryParse(request.Query["preRelease"], out bool preRelease)
+                    ? preRelease
+                    : null,
+            };
         }
 
         private async Task WIDGETS_V1_GetUpdates(HttpContext context)
