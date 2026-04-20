@@ -55,13 +55,8 @@ public class Dnf : PackageManager
 
     public override IReadOnlyList<string> FindCandidateExecutableFiles()
     {
-        var candidates = new List<string>(CoreTools.WhichMultiple("dnf5"));
-        foreach (var path in CoreTools.WhichMultiple("dnf"))
-        {
-            if (!candidates.Contains(path))
-                candidates.Add(path);
-        }
-        foreach (var path in new[] { "/usr/bin/dnf5", "/usr/bin/dnf", "/usr/local/bin/dnf" })
+        var candidates = new List<string>();
+        foreach (var path in new[] { "/usr/bin/dnf5", "/usr/bin/dnf", "/bin/dnf5", "/bin/dnf" })
         {
             if (File.Exists(path) && !candidates.Contains(path))
                 candidates.Add(path);
