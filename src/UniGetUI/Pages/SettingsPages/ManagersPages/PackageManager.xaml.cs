@@ -302,23 +302,6 @@ namespace UniGetUI.Pages.SettingsPages.GeneralPages
                 };
                 ExtraControls.Children.Add(Scoop_CleanupOnStart);
             }
-            // ----------------------------- CHOCO EXTRA SETTINGS ------------------------------
-
-            else if (Manager is Chocolatey)
-            {
-                DisableNotifsCard.CornerRadius = new CornerRadius(8, 8, 0, 0);
-                DisableNotifsCard.BorderThickness = new Thickness(1, 1, 1, 0);
-                ExtraControls.Children.Add(DisableNotifsCard);
-
-                CheckboxCard Chocolatey_SystemChoco = new()
-                {
-                    Text = CoreTools.AutoTranslated("Use system Chocolatey"),
-                    SettingName = Settings.K.UseSystemChocolatey,
-                    CornerRadius = new CornerRadius(0, 0, 8, 8),
-                };
-                Chocolatey_SystemChoco.StateChanged += (_, _) => _ = ReloadPackageManager();
-                ExtraControls.Children.Add(Chocolatey_SystemChoco);
-            }
             // -------------------------------- VCPKG EXTRA SETTINGS --------------------------------------
 
             else if (Manager is Vcpkg)

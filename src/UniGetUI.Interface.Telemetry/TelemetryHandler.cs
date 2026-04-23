@@ -95,7 +95,6 @@ public static class TelemetryHandler
         Settings.K.DoCacheAdminRights,
         Settings.K.DoCacheAdminRightsForBatches,
         Settings.K.ForceLegacyBundledWinGet,
-        Settings.K.UseSystemChocolatey,
     ];
 
     // -------------------------------------------------------------------------

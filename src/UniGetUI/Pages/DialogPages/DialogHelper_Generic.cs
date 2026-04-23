@@ -343,6 +343,29 @@ public static partial class DialogHelper
         await ShowDialogAsync(AdminDialog);
     }
 
+    public static async Task WarnAboutChocolateyMigration()
+    {
+        ContentDialog dialog = new()
+        {
+            Style = Application.Current.Resources["DefaultContentDialogStyle"] as Style,
+        };
+
+        while (Window.XamlRoot is null)
+        {
+            await Task.Delay(100);
+        }
+
+        dialog.XamlRoot = Window.XamlRoot;
+        dialog.PrimaryButtonText = CoreTools.Translate("I understand");
+        dialog.DefaultButton = ContentDialogButton.Primary;
+        dialog.Title = CoreTools.Translate("Chocolatey setup changed");
+        dialog.Content = CoreTools.Translate(
+            "UniGetUI no longer includes its own private Chocolatey installation. A legacy UniGetUI-managed Chocolatey installation was detected for this user profile, but system Chocolatey was not found. Chocolatey will stay unavailable in UniGetUI until Chocolatey is installed on the system and UniGetUI is restarted. Applications previously installed through UniGetUI's bundled Chocolatey may still appear under other sources such as Local PC or WinGet."
+        );
+
+        await ShowDialogAsync(dialog);
+    }
+
     public static async Task ShowAboutUniGetUI()
     {
         ContentDialog AboutDialog = DialogFactory.Create_AsWindow(false, false);

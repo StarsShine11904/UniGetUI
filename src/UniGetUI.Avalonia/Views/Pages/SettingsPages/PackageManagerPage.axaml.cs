@@ -430,21 +430,6 @@ public sealed partial class PackageManagerPage : UserControl, ISettingsPage
                 });
                 break;
 
-            case "Chocolatey":
-                disableNotifsCard.CornerRadius = new CornerRadius(8, 8, 0, 0);
-                disableNotifsCard.BorderThickness = new Thickness(1, 1, 1, 0);
-                ExtraControls.Children.Add(disableNotifsCard);
-
-                var chocoSysChoco = new CheckboxCard
-                {
-                    Text = CoreTools.AutoTranslated("Use system Chocolatey"),
-                    SettingName = CoreSettings.K.UseSystemChocolatey,
-                    CornerRadius = new CornerRadius(0, 0, 8, 8),
-                };
-                chocoSysChoco.StateChanged += (_, _) => _ = ViewModel.ReloadManagerCommand.ExecuteAsync(null);
-                ExtraControls.Children.Add(chocoSysChoco);
-                break;
-
             case "vcpkg":
                 disableNotifsCard.CornerRadius = new CornerRadius(8, 8, 0, 0);
                 disableNotifsCard.BorderThickness = new Thickness(1, 1, 1, 0);

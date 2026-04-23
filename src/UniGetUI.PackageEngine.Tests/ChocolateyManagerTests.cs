@@ -36,7 +36,6 @@ public sealed class ChocolateyManagerTests : IDisposable
         Settings.ResetSettings();
         Settings.Set(Settings.K.EnableProxy, false);
         Settings.Set(Settings.K.EnableProxyAuth, false);
-        Settings.Set(Settings.K.UseSystemChocolatey, false);
         Settings.SetValue(Settings.K.ProxyURL, "");
     }
 

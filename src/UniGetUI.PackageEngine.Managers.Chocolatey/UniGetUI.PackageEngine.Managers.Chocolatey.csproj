@@ -20,12 +20,6 @@
     </ItemGroup>
 
     <ItemGroup>
-        <None Update="choco-cli\bin\*">
-            <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-        </None>
-    </ItemGroup>
-
-    <ItemGroup>
         <Compile Include="..\SharedAssemblyInfo.cs" Link="SharedAssemblyInfo.cs" />
     </ItemGroup>
 

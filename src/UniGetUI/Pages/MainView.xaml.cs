@@ -13,6 +13,7 @@ using UniGetUI.Interface.SoftwarePages;
 using UniGetUI.PackageEngine;
 using UniGetUI.PackageEngine.Enums;
 using UniGetUI.PackageEngine.Interfaces;
+using UniGetUI.PackageEngine.Managers.ChocolateyManager;
 using UniGetUI.PackageEngine.PackageLoader;
 using UniGetUI.PackageOperations;
 using UniGetUI.Pages.DialogPages;
@@ -170,6 +171,16 @@ namespace UniGetUI.Interface
             {
                 Settings.Set(Settings.K.AlreadyWarnedAboutAdmin, true);
                 _ = DialogHelper.WarnAboutAdminRights();
+            }
+
+            if (
+                !PEInterface.Chocolatey.Status.Found
+                && Chocolatey.HasLegacyBundledInstallation()
+                && !Settings.Get(Settings.K.AlreadyWarnedAboutChocolateyMigration)
+            )
+            {
+                Settings.Set(Settings.K.AlreadyWarnedAboutChocolateyMigration, true);
+                _ = DialogHelper.WarnAboutChocolateyMigration();
             }
 
             UpdateOperationsLayout();

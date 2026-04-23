@@ -103,13 +103,12 @@ public sealed class TelemetryHandlerTests : IDisposable
         Settings.Set(Settings.K.DoCacheAdminRights, false);
         Settings.Set(Settings.K.DoCacheAdminRightsForBatches, false);
         Settings.Set(Settings.K.ForceLegacyBundledWinGet, false);
-        Settings.Set(Settings.K.UseSystemChocolatey, false);
         File.WriteAllText(_portableMarkerPath, string.Empty);
         CoreData.WasDaemon = true;
 
         int activeSettings = TelemetryHandler.ComputeActiveSettingsBitmask();
 
-        Assert.Equal(12339, activeSettings);
+        Assert.Equal(6195, activeSettings);
     }
 
     [Fact]
@@ -141,7 +140,7 @@ public sealed class TelemetryHandlerTests : IDisposable
         Assert.Equal(KnownInstallId, root.GetProperty("installID").GetString());
         Assert.True(root.TryGetProperty("enabledManagers", out _));
         Assert.True(root.TryGetProperty("foundManagers", out _));
-        Assert.Equal(12339, root.GetProperty("activeSettings").GetInt32());
+        Assert.Equal(6195, root.GetProperty("activeSettings").GetInt32());
         Assert.Equal("UniGetUI", root.GetProperty("application").GetProperty("name").GetString());
         Assert.Equal("NotApplicable", root.GetProperty("application").GetProperty("dataSource").GetString());
         Assert.Equal("Free", root.GetProperty("application").GetProperty("pricing").GetString());
