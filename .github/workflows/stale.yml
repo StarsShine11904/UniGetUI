@@ -1,0 +1,63 @@
+name: Stale Issue Triage
+
+on:
+  schedule:
+    - cron: '20 8 * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  stale:
+    name: Stale issue triage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Backlog snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          cutoff_date=$(date -u -d '180 days ago' +%F)
+          open_issues=$(gh api -X GET search/issues -f q="repo:$REPOSITORY is:issue is:open" --jq '.total_count')
+          unmilestoned_issues=$(gh api -X GET search/issues -f q="repo:$REPOSITORY is:issue is:open no:milestone" --jq '.total_count')
+          stale_issues=$(gh api -X GET search/issues -f q="repo:$REPOSITORY is:issue is:open label:stale" --jq '.total_count')
+          candidate_issues=$(gh api -X GET search/issues -f q="repo:$REPOSITORY is:issue is:open no:milestone -label:ready-to-go -label:needs-further-study -label:important -label:waiting-for-something updated:<$cutoff_date" --jq '.total_count')
+
+          {
+            echo '## Stale issue triage snapshot'
+            echo
+            echo '| Query | Count |'
+            echo '| --- | ---: |'
+            echo "| Open issues | $open_issues |"
+            echo "| Open unmilestoned issues | $unmilestoned_issues |"
+            echo "| Open issues already labeled stale | $stale_issues |"
+            echo "| 180-day stale candidates | $candidate_issues |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run stale issue triage
+        uses: actions/stale@v10
+        with:
+          days-before-issue-stale: 180
+          days-before-issue-close: 30
+          days-before-pr-stale: -1
+          days-before-pr-close: -1
+          stale-issue-label: stale
+          close-issue-reason: not_planned
+          stale-issue-message: >
+            This issue has not had recent activity. If it is still relevant,
+            please leave a comment with any updated context so we can keep it in
+            the active backlog. If there is no further activity, it will be
+            closed automatically in 30 days.
+          close-issue-message: >
+            This issue was closed because it has been marked as stale for 30
+            days with no further activity. If this is still relevant, please
+            leave a comment with updated context so it can be reviewed again.
+          exempt-all-issue-milestones: true
+          exempt-issue-labels: ready-to-go, needs-further-study, important, waiting-for-something
+          remove-issue-stale-when-updated: true
+          operations-per-run: 20
+          debug-only: false
+          enable-statistics: true
