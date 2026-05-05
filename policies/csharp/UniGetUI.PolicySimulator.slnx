@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="UniGetUI.PolicySimulator.Core/UniGetUI.PolicySimulator.Core.csproj" />
+  <Project Path="UniGetUI.PolicySimulator.Server/UniGetUI.PolicySimulator.Server.csproj" />
+  <Project Path="UniGetUI.PolicySimulator.Client/UniGetUI.PolicySimulator.Client.csproj" />
+  <Project Path="UniGetUI.PolicySimulator.Tests/UniGetUI.PolicySimulator.Tests.csproj" />
+</Solution>

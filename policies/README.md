@@ -20,6 +20,7 @@ The initial format covers WinGet and PowerShell Gallery requests. It is intentio
 | `samples/invalid/` | Invalid policy and request fixtures for fail-closed validation scenarios |
 | `scripts/Invoke-UniGetUIPolicySimulation.ps1` | Runs one policy against one or more request files |
 | `scripts/Test-UniGetUIPolicySamples.ps1` | Runs the bundled end-to-end sample cases |
+| `csharp/UniGetUI.PolicySimulator.slnx` | C# end-to-end policy simulator solution with shared engine, server, client, and tests |
 
 ## Trust Boundary
 
@@ -269,6 +270,47 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\policies\scripts\Invoke-UniGetUI
 ```
 
 The simulator validates JSON or YAML syntax, normalizes YAML to JSON, optionally uses `Test-Json` for JSON Schema validation when available, performs semantic validation, evaluates rules, and prints the selected decision, rule id, and reason. The sample test runner loads scenario manifests and also asserts expected rule ids when a scenario declares one. It never runs a real package manager.
+
+## Running The C# Policy Server Simulator
+
+The C# policy server simulator models the elevated broker boundary. It listens only on loopback by default, receives canonical request documents from a client process, validates JSON or YAML request bodies against the request schema, evaluates them against one configured policy, and returns either a denial or the command an elevated broker would run. It does not execute package managers.
+
+Build the C# sample:
+
+```powershell
+dotnet build .\policies\csharp\UniGetUI.PolicySimulator.slnx
+```
+
+Run the C# scenario and command-construction test runner:
+
+```powershell
+dotnet run --project .\policies\csharp\UniGetUI.PolicySimulator.Tests\UniGetUI.PolicySimulator.Tests.csproj -- --policy-root .\policies
+```
+
+Start the server with a policy:
+
+```powershell
+dotnet run --project .\policies\csharp\UniGetUI.PolicySimulator.Server\UniGetUI.PolicySimulator.Server.csproj -- `
+  --policy .\policies\samples\corporate-allowlist.policy.json `
+  --url http://127.0.0.1:8765
+```
+
+Check readiness:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8765/health
+```
+
+Send a request as the unelevated client would:
+
+```powershell
+dotnet run --project .\policies\csharp\UniGetUI.PolicySimulator.Client\UniGetUI.PolicySimulator.Client.csproj -- `
+  --server http://127.0.0.1:8765 `
+  --request .\policies\samples\requests\winget-vscode-install.request.json `
+  --json
+```
+
+Allowed responses include `wouldExecute: true` and an `execution.command` array. Denied responses return `wouldExecute: false`, the selected policy rule id, and the denial reason. Invalid policy or request documents fail closed with `decision: deny` and `ruleId: <validation-failure>`. The server accepts JSON and YAML request bodies; the sample client sets the content type based on the request file extension.
 
 ## Runtime Integration Notes
 
