@@ -1,0 +1,320 @@
+{
+  "$id": "https://aka.ms/unigetui/package-request.schema.1.0.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "UniGetUI Package Broker Request Schema",
+  "description": "Canonical request sent by an unelevated UniGetUI process to an elevated broker for package operations.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "requestVersion",
+    "requestType",
+    "requestId",
+    "createdAt",
+    "operation",
+    "manager",
+    "source",
+    "package",
+    "options",
+    "broker"
+  ],
+  "properties": {
+    "$schema": {
+      "$ref": "#/$defs/url"
+    },
+    "requestVersion": {
+      "$ref": "#/$defs/semanticVersion",
+      "default": "1.0.0",
+      "description": "The request syntax version."
+    },
+    "requestType": {
+      "type": "string",
+      "const": "packageOperation",
+      "description": "The request type."
+    },
+    "requestId": {
+      "$ref": "#/$defs/resourceId",
+      "description": "Unique client-generated request id used for audit correlation."
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC timestamp when the client created the request."
+    },
+    "operation": {
+      "$ref": "#/$defs/operation"
+    },
+    "manager": {
+      "$ref": "#/$defs/manager"
+    },
+    "source": {
+      "$ref": "#/$defs/source"
+    },
+    "package": {
+      "$ref": "#/$defs/package"
+    },
+    "options": {
+      "$ref": "#/$defs/options"
+    },
+    "broker": {
+      "$ref": "#/$defs/brokerContext"
+    },
+    "simulation": {
+      "$ref": "#/$defs/simulation"
+    }
+  },
+  "$defs": {
+    "semanticVersion": {
+      "type": "string",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\\+([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$",
+      "maxLength": 128
+    },
+    "resourceId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "maxLength": 128
+    },
+    "url": {
+      "type": "string",
+      "pattern": "^([Hh][Tt][Tt][Pp][Ss]?)://.+$",
+      "maxLength": 2048
+    },
+    "operation": {
+      "type": "string",
+      "enum": [
+        "install",
+        "update",
+        "uninstall"
+      ],
+      "description": "The UniGetUI package operation role."
+    },
+    "scope": {
+      "type": "string",
+      "enum": [
+        "user",
+        "machine"
+      ]
+    },
+    "architecture": {
+      "type": "string",
+      "enum": [
+        "x86",
+        "x64",
+        "arm32",
+        "arm64",
+        "neutral"
+      ]
+    },
+    "managerName": {
+      "type": "string",
+      "enum": [
+        "Winget",
+        "PowerShell"
+      ]
+    },
+    "packageIdentifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[^\\/:*?\"<>|\\x01-\\x1f]+$",
+      "description": "Package identifier as reported by the package manager. WinGet identifiers should use Publisher.Package form."
+    },
+    "manager": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "displayName",
+        "executableFriendlyName"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/managerName"
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "executableFriendlyName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "url": {
+          "$ref": "#/$defs/url"
+        },
+        "isVirtualManager": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/packageIdentifier"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "version": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "newVersion": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "channel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16
+        }
+      }
+    },
+    "options": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "interactive",
+        "runAsAdministrator",
+        "skipHashCheck",
+        "preRelease"
+      ],
+      "properties": {
+        "scope": {
+          "$ref": "#/$defs/scope"
+        },
+        "architecture": {
+          "$ref": "#/$defs/architecture"
+        },
+        "version": {
+          "type": "string",
+          "maxLength": 128,
+          "description": "Requested install version. Empty or omitted means the manager default."
+        },
+        "interactive": {
+          "type": "boolean"
+        },
+        "runAsAdministrator": {
+          "type": "boolean"
+        },
+        "skipHashCheck": {
+          "type": "boolean"
+        },
+        "preRelease": {
+          "type": "boolean"
+        },
+        "customInstallLocation": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "customParameters": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "maxItems": 64
+        },
+        "preOperationCommand": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "postOperationCommand": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "killBeforeOperation": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "maxItems": 64,
+          "uniqueItems": true
+        }
+      }
+    },
+    "brokerContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requestedElevation",
+        "effectiveUser"
+      ],
+      "properties": {
+        "requestedElevation": {
+          "type": "string",
+          "enum": [
+            "standard",
+            "elevated"
+          ]
+        },
+        "effectiveUser": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "clientVersion": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "clientProcessPath": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "effectiveCommand": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "maxItems": 256
+        }
+      }
+    },
+    "simulation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "expectedDecision": {
+          "type": "string",
+          "enum": [
+            "allow",
+            "deny"
+          ]
+        },
+        "scenario": {
+          "type": "string",
+          "maxLength": 512
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,477 @@
+{
+  "$id": "https://aka.ms/unigetui/package-policy.schema.1.0.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "UniGetUI Package Broker Policy Schema",
+  "description": "Policy document used by an elevated UniGetUI broker to allow or deny package operation requests from an unelevated client.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "policyVersion",
+    "policyType",
+    "metadata",
+    "enforcement",
+    "rules"
+  ],
+  "properties": {
+    "$schema": {
+      "$ref": "#/$defs/url"
+    },
+    "policyVersion": {
+      "$ref": "#/$defs/semanticVersion",
+      "default": "1.0.0",
+      "description": "The policy syntax version."
+    },
+    "policyType": {
+      "type": "string",
+      "const": "packageBrokerPolicy",
+      "description": "The policy document type."
+    },
+    "metadata": {
+      "$ref": "#/$defs/metadata"
+    },
+    "enforcement": {
+      "$ref": "#/$defs/enforcement"
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/rule"
+      },
+      "minItems": 1,
+      "maxItems": 1024
+    }
+  },
+  "$defs": {
+    "semanticVersion": {
+      "type": "string",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\\+([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$",
+      "maxLength": 128
+    },
+    "resourceId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "maxLength": 128
+    },
+    "url": {
+      "type": "string",
+      "pattern": "^([Hh][Tt][Tt][Pp][Ss]?)://.+$",
+      "maxLength": 2048
+    },
+    "decision": {
+      "type": "string",
+      "enum": [
+        "allow",
+        "deny"
+      ]
+    },
+    "operation": {
+      "type": "string",
+      "enum": [
+        "install",
+        "update",
+        "uninstall"
+      ]
+    },
+    "scope": {
+      "type": "string",
+      "enum": [
+        "user",
+        "machine"
+      ]
+    },
+    "architecture": {
+      "type": "string",
+      "enum": [
+        "x86",
+        "x64",
+        "arm32",
+        "arm64",
+        "neutral"
+      ]
+    },
+    "managerName": {
+      "type": "string",
+      "enum": [
+        "Winget",
+        "PowerShell"
+      ]
+    },
+    "stringPattern": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "description": "Case-insensitive exact value or wildcard pattern using '*'."
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "publisher",
+        "revision",
+        "publishedAt"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/resourceId"
+        },
+        "publisher": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "publishedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "validFrom": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "validUntil": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 512
+        },
+        "supportUrl": {
+          "$ref": "#/$defs/url"
+        }
+      }
+    },
+    "enforcement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "defaultDecision",
+        "failureDecision",
+        "rulePrecedence"
+      ],
+      "properties": {
+        "defaultDecision": {
+          "$ref": "#/$defs/decision",
+          "description": "Decision used when no enabled rule matches. Production allow-list policies should use deny."
+        },
+        "failureDecision": {
+          "type": "string",
+          "const": "deny",
+          "default": "deny",
+          "description": "Decision used when the broker cannot parse or validate the policy or request."
+        },
+        "rulePrecedence": {
+          "type": "string",
+          "const": "priorityThenDeny",
+          "default": "priorityThenDeny",
+          "description": "Lowest numeric priority wins. If matching rules share a priority, deny wins."
+        },
+        "auditMode": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, the simulator reports decisions but does not model enforcement. Runtime broker support is intentionally out of scope for this schema."
+        }
+      }
+    },
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "priority",
+        "decision",
+        "match"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/resourceId"
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "decision": {
+          "$ref": "#/$defs/decision"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 512
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 512
+        },
+        "match": {
+          "$ref": "#/$defs/match"
+        },
+        "constraints": {
+          "$ref": "#/$defs/constraints"
+        }
+      }
+    },
+    "match": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "operations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/operation"
+          },
+          "minItems": 1,
+          "maxItems": 3,
+          "uniqueItems": true
+        },
+        "managers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/managerName"
+          },
+          "minItems": 1,
+          "maxItems": 16,
+          "uniqueItems": true
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/stringPattern"
+          },
+          "minItems": 1,
+          "maxItems": 128,
+          "uniqueItems": true
+        },
+        "packageIdentifiers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/stringPattern"
+          },
+          "minItems": 1,
+          "maxItems": 1024,
+          "uniqueItems": true
+        },
+        "packageNames": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/stringPattern"
+          },
+          "minItems": 1,
+          "maxItems": 1024,
+          "uniqueItems": true
+        },
+        "versions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": true
+        },
+        "versionRange": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "minVersion": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "maxVersion": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "includePrerelease": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/scope"
+          },
+          "minItems": 1,
+          "maxItems": 2,
+          "uniqueItems": true
+        },
+        "architectures": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/architecture"
+          },
+          "minItems": 1,
+          "maxItems": 5,
+          "uniqueItems": true
+        },
+        "elevation": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "elevated"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 2,
+          "uniqueItems": true
+        },
+        "runAsAdministrator": {
+          "type": "array",
+          "items": {
+            "type": "boolean"
+          },
+          "minItems": 1,
+          "maxItems": 2,
+          "uniqueItems": true
+        },
+        "interactive": {
+          "type": "array",
+          "items": {
+            "type": "boolean"
+          },
+          "minItems": 1,
+          "maxItems": 2,
+          "uniqueItems": true
+        },
+        "skipHashCheck": {
+          "type": "array",
+          "items": {
+            "type": "boolean"
+          },
+          "minItems": 1,
+          "maxItems": 2,
+          "uniqueItems": true
+        },
+        "preRelease": {
+          "type": "array",
+          "items": {
+            "type": "boolean"
+          },
+          "minItems": 1,
+          "maxItems": 2,
+          "uniqueItems": true
+        },
+        "hasCustomParameters": {
+          "type": "array",
+          "items": {
+            "type": "boolean"
+          },
+          "minItems": 1,
+          "maxItems": 2,
+          "uniqueItems": true
+        },
+        "hasCustomInstallLocation": {
+          "type": "array",
+          "items": {
+            "type": "boolean"
+          },
+          "minItems": 1,
+          "maxItems": 2,
+          "uniqueItems": true
+        },
+        "hasPrePostCommands": {
+          "type": "array",
+          "items": {
+            "type": "boolean"
+          },
+          "minItems": 1,
+          "maxItems": 2,
+          "uniqueItems": true
+        },
+        "hasKillBeforeOperation": {
+          "type": "array",
+          "items": {
+            "type": "boolean"
+          },
+          "minItems": 1,
+          "maxItems": 2,
+          "uniqueItems": true
+        }
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowInteractive": {
+          "type": "boolean"
+        },
+        "allowRunAsAdministrator": {
+          "type": "boolean"
+        },
+        "allowSkipHashCheck": {
+          "type": "boolean"
+        },
+        "allowPreRelease": {
+          "type": "boolean"
+        },
+        "allowCustomInstallLocation": {
+          "type": "boolean"
+        },
+        "allowedInstallLocationPatterns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/stringPattern"
+          },
+          "maxItems": 64,
+          "uniqueItems": true
+        },
+        "allowCustomParameters": {
+          "type": "boolean"
+        },
+        "allowedCustomParameters": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "maxItems": 128,
+          "uniqueItems": true
+        },
+        "allowedCustomParameterPatterns": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "maxItems": 128,
+          "uniqueItems": true
+        },
+        "deniedCustomParameters": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "maxItems": 128,
+          "uniqueItems": true
+        },
+        "allowPrePostCommands": {
+          "type": "boolean"
+        },
+        "allowKillBeforeOperation": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}
