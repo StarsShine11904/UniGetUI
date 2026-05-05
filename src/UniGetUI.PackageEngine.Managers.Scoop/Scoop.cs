@@ -400,8 +400,8 @@ namespace UniGetUI.PackageEngine.Managers.ScoopManager
             {
                 StartInfo = new ProcessStartInfo
                 {
-                    FileName = path,
-                    Arguments = query,
+                    FileName = Status.ExecutablePath,
+                    Arguments = $"-NoProfile -ExecutionPolicy Bypass -Command \"& '{path.Replace("'", "''")}' '{query.Replace("'", "''")}'\"",
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     UseShellExecute = false,
