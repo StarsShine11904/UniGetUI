@@ -14,7 +14,15 @@ public static class CommandLineBuilder
 
     private static IReadOnlyList<string> BuildWinget(PackageRequest request)
     {
-        var command = new List<string> { "winget.exe", request.Operation, "--id", request.Package.Id, "--exact" };
+        var operation = request.Operation switch
+        {
+            "install" => "install",
+            "update" => "upgrade",
+            "uninstall" => "uninstall",
+            _ => throw new InvalidOperationException($"Unsupported WinGet operation '{request.Operation}'.")
+        };
+
+        var command = new List<string> { "winget.exe", operation, "--id", request.Package.Id, "--exact" };
         AddPair(command, "--source", request.Source.Name);
         AddPair(command, "--scope", request.Options.Scope);
         AddPair(command, "--version", request.Options.Version);
@@ -37,8 +45,8 @@ public static class CommandLineBuilder
         };
 
         var command = new List<string> { "pwsh.exe", "-NoProfile", "-Command", verb, "-Name", request.Package.Id };
-        if (request.Options.Scope == "user") command.AddRange(["-Scope", "CurrentUser"]);
-        if (request.Options.Scope == "machine") command.AddRange(["-Scope", "AllUsers"]);
+        if (request.Operation == "install" && request.Options.Scope == "user") command.AddRange(["-Scope", "CurrentUser"]);
+        if (request.Operation == "install" && request.Options.Scope == "machine") command.AddRange(["-Scope", "AllUsers"]);
         AddPair(command, "-RequiredVersion", request.Options.Version);
         if (request.Options.PreRelease) command.Add("-AllowPrerelease");
         if (request.Options.SkipHashCheck) command.Add("-SkipPublisherCheck");

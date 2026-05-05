@@ -152,6 +152,28 @@
         "allowPrePostCommands": false,
         "allowKillBeforeOperation": false
       }
+    },
+    {
+      "id": "allow.winget.git.uninstall",
+      "priority": 100,
+      "decision": "allow",
+      "reason": "Git uninstall is allowed for the same corporate package source and machine scope.",
+      "match": {
+        "operations": ["uninstall"],
+        "managers": ["Winget"],
+        "sources": ["winget"],
+        "packageIdentifiers": ["Git.Git"],
+        "scopes": ["machine"],
+        "architectures": ["x64"]
+      },
+      "constraints": {
+        "allowInteractive": false,
+        "allowSkipHashCheck": false,
+        "allowPreRelease": false,
+        "allowCustomParameters": false,
+        "allowPrePostCommands": false,
+        "allowKillBeforeOperation": false
+      }
     }
   ]
 }

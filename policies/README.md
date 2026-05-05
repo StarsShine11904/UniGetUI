@@ -14,6 +14,7 @@ The initial format covers WinGet and PowerShell Gallery requests. It is intentio
 | `samples/corporate-allowlist.policy.yaml` | YAML form of a fail-closed WinGet allow-list sample |
 | `samples/deny-risky-options.policy.json` | Default-allow policy that denies risky request options |
 | `samples/powershell-current-user.policy.json` | PowerShell Gallery CurrentUser-only sample |
+| `samples/powershell-advanced.policy.json` | PowerShell source, version-range, and update-operation coverage sample |
 | `samples/scenario-coverage.policy.json` | Focused policy for precedence, version, and constraint scenarios |
 | `samples/requests/winget-vscode-install.request.yaml` | YAML form of a canonical WinGet request sample |
 | `samples/scenarios/*.scenarios.json` | Data-driven scenario manifests with expected decisions and rule ids |
@@ -184,10 +185,11 @@ WinGet requests map to the current UniGetUI WinGet operation helper semantics:
 
 | Request field | WinGet command meaning |
 | --- | --- |
+| `operation` | `install`, `upgrade` for request `update`, or `uninstall` |
 | `package.id` | `--id <id> --exact` |
 | `source.name` | `--source <source>` |
 | `options.scope` | `--scope user` or `--scope machine` |
-| `options.version` | `--version <version>` on install |
+| `options.version` | `--version <version>` when supplied |
 | `options.interactive` | `--interactive` when true, otherwise `--silent` |
 | `options.architecture` | `--architecture x86`, `x64`, or `arm64` |
 | `options.skipHashCheck` | `--ignore-security-hash` when true |
@@ -202,9 +204,10 @@ PowerShell requests map to the current UniGetUI PowerShell operation helper sema
 
 | Request field | PowerShell command meaning |
 | --- | --- |
+| `operation` | `Install-Module`, `Update-Module`, or `Uninstall-Module` |
 | `package.id` | `-Name <id>` |
-| `options.scope` | `CurrentUser` for `user`, `AllUsers` for `machine` |
-| `options.version` | `-RequiredVersion <version>` on install |
+| `options.scope` | `-Scope CurrentUser` or `-Scope AllUsers` for install operations |
+| `options.version` | `-RequiredVersion <version>` when supplied |
 | `options.preRelease` | `-AllowPrerelease` when true |
 | `options.skipHashCheck` | `-SkipPublisherCheck` when true |
 | `options.customParameters` | Additional operation parameters, if policy allows them |
@@ -221,7 +224,9 @@ Bundled scenarios are data-driven through manifest files under `samples/scenario
 | Baseline deny-list | Default-allow behavior with explicit denials for hash/publisher bypass, custom parameters, and unapproved WinGet sources |
 | JSON/YAML parity | JSON policy with YAML request, YAML policy with JSON request, and YAML policy with YAML request |
 | Rule precedence | Disabled rules are ignored and deny wins when allow and deny rules match at the same priority |
-| Version matching | Allowed WinGet version range, out-of-range default deny, and prerelease version default deny |
+| Operation mapping | Install, update, and uninstall decisions, including WinGet update-to-upgrade command construction |
+| Source and architecture matching | Unapproved WinGet source default deny, WinGet architecture mismatch default deny, and untrusted PowerShell source deny |
+| Version matching | Allowed WinGet and PowerShell version ranges, out-of-range default deny, and prerelease version default deny |
 | Constraints | Allowed and denied custom install locations and package-manager parameters |
 | Risky options | Denials for interactive installs, pre/post commands, kill-before-operation, prerelease modules, and publisher-check bypass |
 | Validation | Invalid request and policy fixtures fail closed with a deny decision |
