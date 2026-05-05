@@ -22,7 +22,10 @@ $cases = @(
     @{ Policy = "deny-risky-options.policy.json"; Request = "winget-vscode-custom-param.request.json"; Expected = "deny" },
     @{ Policy = "deny-risky-options.policy.json"; Request = "winget-vscode-msstore.request.json"; Expected = "deny" },
     @{ Policy = "powershell-current-user.policy.json"; Request = "powershell-pester-currentuser.request.json"; Expected = "allow" },
-    @{ Policy = "powershell-current-user.policy.json"; Request = "powershell-pester-allusers.request.json"; Expected = "deny" }
+    @{ Policy = "powershell-current-user.policy.json"; Request = "powershell-pester-allusers.request.json"; Expected = "deny" },
+    @{ Policy = "corporate-allowlist.policy.yaml"; Request = "winget-vscode-install.request.yaml"; Expected = "allow" },
+    @{ Policy = "corporate-allowlist.policy.yaml"; Request = "winget-vscode-skiphash.request.json"; Expected = "deny" },
+    @{ Policy = "corporate-allowlist.policy.json"; Request = "winget-vscode-install.request.yaml"; Expected = "allow" }
 )
 
 $results = @()

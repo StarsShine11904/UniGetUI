@@ -11,8 +11,10 @@ The initial format covers WinGet and PowerShell Gallery requests. It is intentio
 | `schemas/unigetui.package-policy.schema.1.0.json` | JSON Schema for admin-authored policy files |
 | `schemas/unigetui.package-request.schema.1.0.json` | JSON Schema for canonical unelevated-to-broker package requests |
 | `samples/corporate-allowlist.policy.json` | Fail-closed WinGet allow-list sample |
+| `samples/corporate-allowlist.policy.yaml` | YAML form of a fail-closed WinGet allow-list sample |
 | `samples/deny-risky-options.policy.json` | Default-allow policy that denies risky request options |
 | `samples/powershell-current-user.policy.json` | PowerShell Gallery CurrentUser-only sample |
+| `samples/requests/winget-vscode-install.request.yaml` | YAML form of a canonical WinGet request sample |
 | `scripts/Invoke-UniGetUIPolicySimulation.ps1` | Runs one policy against one or more request files |
 | `scripts/Test-UniGetUIPolicySamples.ps1` | Runs the bundled end-to-end sample cases |
 
@@ -44,7 +46,11 @@ Recommended production behavior is fail closed:
 
 ## Policy Format
 
-A policy file uses JSON and starts with version and type fields inspired by WinGet manifest conventions:
+A policy file can be authored as JSON or YAML, following WinGet's practical authoring model. The JSON Schema files remain the authoritative contract; YAML documents are parsed and normalized to canonical JSON before schema validation and rule evaluation.
+
+Supported file extensions are `.json`, `.yaml`, and `.yml`. The simulation scripts use `ConvertFrom-Yaml` from the `powershell-yaml` module when available. When running under Windows PowerShell without that command, they can fall back to an installed `pwsh` that can import `powershell-yaml`.
+
+JSON policies start with version and type fields inspired by WinGet manifest conventions:
 
 ```json
 {
@@ -64,6 +70,24 @@ A policy file uses JSON and starts with version and type fields inspired by WinG
   },
   "rules": []
 }
+```
+
+The same policy shape can be written as YAML:
+
+```yaml
+"$schema": https://aka.ms/unigetui/package-policy.schema.1.0.json
+policyVersion: 1.0.0
+policyType: packageBrokerPolicy
+metadata:
+  id: contoso.desktop.standard-allowlist-yaml
+  publisher: Contoso IT
+  revision: 1
+  publishedAt: "2026-05-05T00:00:00Z"
+enforcement:
+  defaultDecision: deny
+  failureDecision: deny
+  rulePrecedence: priorityThenDeny
+rules: []
 ```
 
 Rules contain four core fields:
@@ -190,6 +214,9 @@ Known PowerShell sources in UniGetUI include `PSGallery` and `PoshTestGallery`. 
 | `corporate-allowlist.policy.json` | `winget-vscode-install.request.json` | Allow | Package id, source, scope, architecture, and options match the VS Code allow rule |
 | `corporate-allowlist.policy.json` | `winget-unknown-install.request.json` | Deny | No allow rule matches and the policy default is deny |
 | `corporate-allowlist.policy.json` | `winget-vscode-skiphash.request.json` | Deny | A higher priority deny rule matches `skipHashCheck: true` |
+| `corporate-allowlist.policy.yaml` | `winget-vscode-install.request.yaml` | Allow | YAML policy and YAML request normalize to the same broker decision model as JSON |
+| `corporate-allowlist.policy.yaml` | `winget-vscode-skiphash.request.json` | Deny | YAML policy and JSON request can be mixed in one evaluation |
+| `corporate-allowlist.policy.json` | `winget-vscode-install.request.yaml` | Allow | JSON policy and YAML request can also be mixed |
 | `deny-risky-options.policy.json` | `winget-vscode-install.request.json` | Allow | No risky option deny rule matches and the default is allow |
 | `deny-risky-options.policy.json` | `winget-vscode-custom-param.request.json` | Deny | The request contains custom package-manager parameters |
 | `deny-risky-options.policy.json` | `winget-vscode-msstore.request.json` | Deny | The request uses the `msstore` source, which is denied by the sample |
@@ -212,7 +239,15 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\policies\scripts\Invoke-UniGetUI
   -RequestPath .\policies\samples\requests\winget-vscode-*.request.json
 ```
 
-The simulator validates JSON syntax, optionally uses `Test-Json` for JSON Schema validation when available, performs semantic validation, evaluates rules, and prints the selected decision, rule id, and reason. It never runs a real package manager.
+Run a YAML policy against a YAML request:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\policies\scripts\Invoke-UniGetUIPolicySimulation.ps1 `
+  -PolicyPath .\policies\samples\corporate-allowlist.policy.yaml `
+  -RequestPath .\policies\samples\requests\winget-vscode-install.request.yaml
+```
+
+The simulator validates JSON or YAML syntax, normalizes YAML to JSON, optionally uses `Test-Json` for JSON Schema validation when available, performs semantic validation, evaluates rules, and prints the selected decision, rule id, and reason. It never runs a real package manager.
 
 ## Runtime Integration Notes
 

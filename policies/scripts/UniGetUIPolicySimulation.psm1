@@ -1,6 +1,57 @@
 Set-StrictMode -Version 2.0
 
-function Read-UniGetUIJsonFile {
+function ConvertFrom-UniGetUIYamlText {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Yaml,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Path
+    )
+
+    $convertFromYamlCommand = Get-Command -Name ConvertFrom-Yaml -ErrorAction SilentlyContinue
+    if ($null -ne $convertFromYamlCommand) {
+        try {
+            return ConvertFrom-Yaml -Yaml $Yaml -Ordered -ErrorAction Stop
+        }
+        catch {
+            throw "Failed to parse YAML file '$Path': $($_.Exception.Message)"
+        }
+    }
+
+    $pwshCommand = Get-Command -Name pwsh -ErrorAction SilentlyContinue
+    if ($null -ne $pwshCommand) {
+        $script = @'
+$yaml = [Console]::In.ReadToEnd()
+try {
+    Import-Module powershell-yaml -ErrorAction Stop
+    $data = ConvertFrom-Yaml -Yaml $yaml -Ordered -ErrorAction Stop
+    $data | ConvertTo-Json -Depth 100
+}
+catch {
+    Write-Error $_.Exception.Message
+    exit 1
+}
+'@
+
+        $output = $Yaml | & $pwshCommand.Source -NoProfile -ExecutionPolicy Bypass -Command $script 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to parse YAML file '$Path': $($output -join [Environment]::NewLine)"
+        }
+
+        try {
+            return ($output -join [Environment]::NewLine) | ConvertFrom-Json -ErrorAction Stop
+        }
+        catch {
+            throw "Failed to convert YAML file '$Path' to canonical JSON: $($_.Exception.Message)"
+        }
+    }
+
+    throw "Failed to parse YAML file '$Path': ConvertFrom-Yaml is unavailable. Install the powershell-yaml module or run from a shell that can import it."
+}
+
+function Read-UniGetUIDocumentFile {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -8,19 +59,54 @@ function Read-UniGetUIJsonFile {
     )
 
     $resolvedPath = Resolve-Path -LiteralPath $Path -ErrorAction Stop
-    $json = Get-Content -LiteralPath $resolvedPath.Path -Raw -Encoding UTF8
-    try {
-        $data = $json | ConvertFrom-Json -ErrorAction Stop
+    $text = Get-Content -LiteralPath $resolvedPath.Path -Raw -Encoding UTF8
+    $extension = [System.IO.Path]::GetExtension($resolvedPath.Path).ToLowerInvariant()
+    $format = $null
+    $data = $null
+    $json = $null
+
+    if ($extension -eq ".json") {
+        $format = "json"
+        $json = $text
+        try {
+            $data = $json | ConvertFrom-Json -ErrorAction Stop
+        }
+        catch {
+            throw "Failed to parse JSON file '$Path': $($_.Exception.Message)"
+        }
     }
-    catch {
-        throw "Failed to parse JSON file '$Path': $($_.Exception.Message)"
+    elseif ($extension -eq ".yaml" -or $extension -eq ".yml") {
+        $format = "yaml"
+        $yamlData = ConvertFrom-UniGetUIYamlText -Yaml $text -Path $Path
+        try {
+            $json = $yamlData | ConvertTo-Json -Depth 100
+            $data = $json | ConvertFrom-Json -ErrorAction Stop
+        }
+        catch {
+            throw "Failed to normalize YAML file '$Path' to canonical JSON: $($_.Exception.Message)"
+        }
+    }
+    else {
+        throw "Unsupported policy document extension '$extension' for '$Path'. Use .json, .yaml, or .yml."
     }
 
     [pscustomobject]@{
         Path = $resolvedPath.Path
+        Format = $format
+        Text = $text
         Json = $json
         Data = $data
     }
+}
+
+function Read-UniGetUIJsonFile {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Path
+    )
+
+    Read-UniGetUIDocumentFile -Path $Path
 }
 
 function Test-UniGetUIJsonSchemaIfAvailable {
@@ -331,29 +417,29 @@ function Test-UniGetUIRuleMatch {
         return [pscustomobject]@{ Matched = $false; Reason = "Rule is disabled." }
     }
 
-    $match = $Rule.match
+    $ruleMatch = $Rule.match
     $flags = Get-RequestDerivedFlags -Request $Request
     $effectiveVersion = Get-EffectiveRequestVersion -Request $Request
 
     $checks = @(
-        @{ Name = "operations"; Matched = (Test-ValueInList -Value $Request.operation -List (Get-ObjectPropertyValue -InputObject $match -Name "operations")) },
-        @{ Name = "managers"; Matched = (Test-ValueInList -Value $Request.manager.name -List (Get-ObjectPropertyValue -InputObject $match -Name "managers")) },
-        @{ Name = "sources"; Matched = (Test-WildcardAny -Value $Request.source.name -Patterns (Get-ObjectPropertyValue -InputObject $match -Name "sources")) },
-        @{ Name = "packageIdentifiers"; Matched = (Test-WildcardAny -Value $Request.package.id -Patterns (Get-ObjectPropertyValue -InputObject $match -Name "packageIdentifiers")) },
-        @{ Name = "packageNames"; Matched = (Test-WildcardAny -Value $Request.package.name -Patterns (Get-ObjectPropertyValue -InputObject $match -Name "packageNames")) },
-        @{ Name = "versions"; Matched = (Test-ValueInList -Value $effectiveVersion -List (Get-ObjectPropertyValue -InputObject $match -Name "versions")) },
-        @{ Name = "versionRange"; Matched = (Test-VersionRangeMatch -Version $effectiveVersion -VersionRange (Get-ObjectPropertyValue -InputObject $match -Name "versionRange")) },
-        @{ Name = "scopes"; Matched = (Test-ValueInList -Value (Get-ObjectPropertyValue -InputObject $Request.options -Name "scope") -List (Get-ObjectPropertyValue -InputObject $match -Name "scopes")) },
-        @{ Name = "architectures"; Matched = (Test-ValueInList -Value (Get-ObjectPropertyValue -InputObject $Request.options -Name "architecture") -List (Get-ObjectPropertyValue -InputObject $match -Name "architectures")) },
-        @{ Name = "elevation"; Matched = (Test-ValueInList -Value $Request.broker.requestedElevation -List (Get-ObjectPropertyValue -InputObject $match -Name "elevation")) },
-        @{ Name = "runAsAdministrator"; Matched = (Test-ValueInList -Value ([bool] $Request.options.runAsAdministrator) -List (Get-ObjectPropertyValue -InputObject $match -Name "runAsAdministrator")) },
-        @{ Name = "interactive"; Matched = (Test-ValueInList -Value ([bool] $Request.options.interactive) -List (Get-ObjectPropertyValue -InputObject $match -Name "interactive")) },
-        @{ Name = "skipHashCheck"; Matched = (Test-ValueInList -Value ([bool] $Request.options.skipHashCheck) -List (Get-ObjectPropertyValue -InputObject $match -Name "skipHashCheck")) },
-        @{ Name = "preRelease"; Matched = (Test-ValueInList -Value ([bool] $Request.options.preRelease) -List (Get-ObjectPropertyValue -InputObject $match -Name "preRelease")) },
-        @{ Name = "hasCustomParameters"; Matched = (Test-ValueInList -Value ([bool] $flags.HasCustomParameters) -List (Get-ObjectPropertyValue -InputObject $match -Name "hasCustomParameters")) },
-        @{ Name = "hasCustomInstallLocation"; Matched = (Test-ValueInList -Value ([bool] $flags.HasCustomInstallLocation) -List (Get-ObjectPropertyValue -InputObject $match -Name "hasCustomInstallLocation")) },
-        @{ Name = "hasPrePostCommands"; Matched = (Test-ValueInList -Value ([bool] $flags.HasPrePostCommands) -List (Get-ObjectPropertyValue -InputObject $match -Name "hasPrePostCommands")) },
-        @{ Name = "hasKillBeforeOperation"; Matched = (Test-ValueInList -Value ([bool] $flags.HasKillBeforeOperation) -List (Get-ObjectPropertyValue -InputObject $match -Name "hasKillBeforeOperation")) }
+        @{ Name = "operations"; Matched = (Test-ValueInList -Value $Request.operation -List (Get-ObjectPropertyValue -InputObject $ruleMatch -Name "operations")) },
+        @{ Name = "managers"; Matched = (Test-ValueInList -Value $Request.manager.name -List (Get-ObjectPropertyValue -InputObject $ruleMatch -Name "managers")) },
+        @{ Name = "sources"; Matched = (Test-WildcardAny -Value $Request.source.name -Patterns (Get-ObjectPropertyValue -InputObject $ruleMatch -Name "sources")) },
+        @{ Name = "packageIdentifiers"; Matched = (Test-WildcardAny -Value $Request.package.id -Patterns (Get-ObjectPropertyValue -InputObject $ruleMatch -Name "packageIdentifiers")) },
+        @{ Name = "packageNames"; Matched = (Test-WildcardAny -Value $Request.package.name -Patterns (Get-ObjectPropertyValue -InputObject $ruleMatch -Name "packageNames")) },
+        @{ Name = "versions"; Matched = (Test-ValueInList -Value $effectiveVersion -List (Get-ObjectPropertyValue -InputObject $ruleMatch -Name "versions")) },
+        @{ Name = "versionRange"; Matched = (Test-VersionRangeMatch -Version $effectiveVersion -VersionRange (Get-ObjectPropertyValue -InputObject $ruleMatch -Name "versionRange")) },
+        @{ Name = "scopes"; Matched = (Test-ValueInList -Value (Get-ObjectPropertyValue -InputObject $Request.options -Name "scope") -List (Get-ObjectPropertyValue -InputObject $ruleMatch -Name "scopes")) },
+        @{ Name = "architectures"; Matched = (Test-ValueInList -Value (Get-ObjectPropertyValue -InputObject $Request.options -Name "architecture") -List (Get-ObjectPropertyValue -InputObject $ruleMatch -Name "architectures")) },
+        @{ Name = "elevation"; Matched = (Test-ValueInList -Value $Request.broker.requestedElevation -List (Get-ObjectPropertyValue -InputObject $ruleMatch -Name "elevation")) },
+        @{ Name = "runAsAdministrator"; Matched = (Test-ValueInList -Value ([bool] $Request.options.runAsAdministrator) -List (Get-ObjectPropertyValue -InputObject $ruleMatch -Name "runAsAdministrator")) },
+        @{ Name = "interactive"; Matched = (Test-ValueInList -Value ([bool] $Request.options.interactive) -List (Get-ObjectPropertyValue -InputObject $ruleMatch -Name "interactive")) },
+        @{ Name = "skipHashCheck"; Matched = (Test-ValueInList -Value ([bool] $Request.options.skipHashCheck) -List (Get-ObjectPropertyValue -InputObject $ruleMatch -Name "skipHashCheck")) },
+        @{ Name = "preRelease"; Matched = (Test-ValueInList -Value ([bool] $Request.options.preRelease) -List (Get-ObjectPropertyValue -InputObject $ruleMatch -Name "preRelease")) },
+        @{ Name = "hasCustomParameters"; Matched = (Test-ValueInList -Value ([bool] $flags.HasCustomParameters) -List (Get-ObjectPropertyValue -InputObject $ruleMatch -Name "hasCustomParameters")) },
+        @{ Name = "hasCustomInstallLocation"; Matched = (Test-ValueInList -Value ([bool] $flags.HasCustomInstallLocation) -List (Get-ObjectPropertyValue -InputObject $ruleMatch -Name "hasCustomInstallLocation")) },
+        @{ Name = "hasPrePostCommands"; Matched = (Test-ValueInList -Value ([bool] $flags.HasPrePostCommands) -List (Get-ObjectPropertyValue -InputObject $ruleMatch -Name "hasPrePostCommands")) },
+        @{ Name = "hasKillBeforeOperation"; Matched = (Test-ValueInList -Value ([bool] $flags.HasKillBeforeOperation) -List (Get-ObjectPropertyValue -InputObject $ruleMatch -Name "hasKillBeforeOperation")) }
     )
 
     foreach ($check in $checks) {
@@ -445,11 +531,11 @@ function Invoke-UniGetUIPolicyDecision {
     Assert-UniGetUIPolicyShape -Policy $Policy
     Assert-UniGetUIRequestShape -Request $Request
 
-    $matches = @()
+    $matchingRules = @()
     foreach ($rule in @($Policy.rules)) {
         $matchResult = Test-UniGetUIRuleMatch -Rule $rule -Request $Request
         if ($matchResult.Matched) {
-            $matches += [pscustomobject]@{
+            $matchingRules += [pscustomobject]@{
                 Id = $rule.id
                 Priority = [int] $rule.priority
                 Decision = $rule.decision
@@ -458,7 +544,7 @@ function Invoke-UniGetUIPolicyDecision {
         }
     }
 
-    if ($matches.Count -eq 0) {
+    if ($matchingRules.Count -eq 0) {
         return [pscustomobject]@{
             Decision = $Policy.enforcement.defaultDecision
             RuleId = "<default>"
@@ -468,7 +554,7 @@ function Invoke-UniGetUIPolicyDecision {
         }
     }
 
-    $ordered = @($matches | Sort-Object -Property @{ Expression = "Priority"; Ascending = $true }, @{ Expression = { if ($_.Decision -eq "deny") { 0 } else { 1 } }; Ascending = $true })
+    $ordered = @($matchingRules | Sort-Object -Property @{ Expression = "Priority"; Ascending = $true }, @{ Expression = { if ($_.Decision -eq "deny") { 0 } else { 1 } }; Ascending = $true })
     $winner = $ordered[0]
 
     [pscustomobject]@{
@@ -494,8 +580,8 @@ function Invoke-UniGetUIPolicyFileDecision {
         [string] $RequestSchemaPath
     )
 
-    $policyFile = Read-UniGetUIJsonFile -Path $PolicyPath
-    $requestFile = Read-UniGetUIJsonFile -Path $RequestPath
+    $policyFile = Read-UniGetUIDocumentFile -Path $PolicyPath
+    $requestFile = Read-UniGetUIDocumentFile -Path $RequestPath
 
     $policySchemaResult = $null
     $requestSchemaResult = $null
@@ -578,6 +664,7 @@ function Invoke-UniGetUIPolicyFileDecision {
 }
 
 Export-ModuleMember -Function @(
+    "Read-UniGetUIDocumentFile",
     "Read-UniGetUIJsonFile",
     "Test-UniGetUIJsonSchemaIfAvailable",
     "Assert-UniGetUIPolicyShape",
