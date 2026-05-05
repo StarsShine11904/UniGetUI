@@ -248,6 +248,7 @@ function Assert-UniGetUIRequestShape {
 function Get-ObjectPropertyValue {
     param(
         [Parameter(Mandatory = $true)]
+        [AllowNull()]
         [object] $InputObject,
 
         [Parameter(Mandatory = $true)]
@@ -667,6 +668,7 @@ Export-ModuleMember -Function @(
     "Read-UniGetUIDocumentFile",
     "Read-UniGetUIJsonFile",
     "Test-UniGetUIJsonSchemaIfAvailable",
+    "Get-ObjectPropertyValue",
     "Assert-UniGetUIPolicyShape",
     "Assert-UniGetUIRequestShape",
     "Invoke-UniGetUIPolicyDecision",

@@ -14,7 +14,10 @@ The initial format covers WinGet and PowerShell Gallery requests. It is intentio
 | `samples/corporate-allowlist.policy.yaml` | YAML form of a fail-closed WinGet allow-list sample |
 | `samples/deny-risky-options.policy.json` | Default-allow policy that denies risky request options |
 | `samples/powershell-current-user.policy.json` | PowerShell Gallery CurrentUser-only sample |
+| `samples/scenario-coverage.policy.json` | Focused policy for precedence, version, and constraint scenarios |
 | `samples/requests/winget-vscode-install.request.yaml` | YAML form of a canonical WinGet request sample |
+| `samples/scenarios/*.scenarios.json` | Data-driven scenario manifests with expected decisions and rule ids |
+| `samples/invalid/` | Invalid policy and request fixtures for fail-closed validation scenarios |
 | `scripts/Invoke-UniGetUIPolicySimulation.ps1` | Runs one policy against one or more request files |
 | `scripts/Test-UniGetUIPolicySamples.ps1` | Runs the bundled end-to-end sample cases |
 
@@ -209,19 +212,18 @@ Known PowerShell sources in UniGetUI include `PSGallery` and `PoshTestGallery`. 
 
 ## Scenario Outcomes
 
-| Policy | Request | Expected | Why |
-| --- | --- | --- | --- |
-| `corporate-allowlist.policy.json` | `winget-vscode-install.request.json` | Allow | Package id, source, scope, architecture, and options match the VS Code allow rule |
-| `corporate-allowlist.policy.json` | `winget-unknown-install.request.json` | Deny | No allow rule matches and the policy default is deny |
-| `corporate-allowlist.policy.json` | `winget-vscode-skiphash.request.json` | Deny | A higher priority deny rule matches `skipHashCheck: true` |
-| `corporate-allowlist.policy.yaml` | `winget-vscode-install.request.yaml` | Allow | YAML policy and YAML request normalize to the same broker decision model as JSON |
-| `corporate-allowlist.policy.yaml` | `winget-vscode-skiphash.request.json` | Deny | YAML policy and JSON request can be mixed in one evaluation |
-| `corporate-allowlist.policy.json` | `winget-vscode-install.request.yaml` | Allow | JSON policy and YAML request can also be mixed |
-| `deny-risky-options.policy.json` | `winget-vscode-install.request.json` | Allow | No risky option deny rule matches and the default is allow |
-| `deny-risky-options.policy.json` | `winget-vscode-custom-param.request.json` | Deny | The request contains custom package-manager parameters |
-| `deny-risky-options.policy.json` | `winget-vscode-msstore.request.json` | Deny | The request uses the `msstore` source, which is denied by the sample |
-| `powershell-current-user.policy.json` | `powershell-pester-currentuser.request.json` | Allow | Pester from PSGallery with CurrentUser scope matches the allow rule |
-| `powershell-current-user.policy.json` | `powershell-pester-allusers.request.json` | Deny | Machine scope and elevation match higher priority deny rules |
+Bundled scenarios are data-driven through manifest files under `samples/scenarios/`. Each scenario declares an id, policy fixture, request fixture, expected decision, expected rule id, and tags. The current manifests cover these categories:
+
+| Category | Coverage |
+| --- | --- |
+| Baseline allow-list | Approved WinGet and PowerShell requests, unknown-package default deny, and PowerShell machine-scope deny |
+| Baseline deny-list | Default-allow behavior with explicit denials for hash/publisher bypass, custom parameters, and unapproved WinGet sources |
+| JSON/YAML parity | JSON policy with YAML request, YAML policy with JSON request, and YAML policy with YAML request |
+| Rule precedence | Disabled rules are ignored and deny wins when allow and deny rules match at the same priority |
+| Version matching | Allowed WinGet version range, out-of-range default deny, and prerelease version default deny |
+| Constraints | Allowed and denied custom install locations and package-manager parameters |
+| Risky options | Denials for interactive installs, pre/post commands, kill-before-operation, prerelease modules, and publisher-check bypass |
+| Validation | Invalid request and policy fixtures fail closed with a deny decision |
 
 ## Running The Simulation
 
@@ -229,6 +231,25 @@ Run all bundled sample cases:
 
 ```powershell
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\policies\scripts\Test-UniGetUIPolicySamples.ps1
+```
+
+List scenarios without running them:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\policies\scripts\Test-UniGetUIPolicySamples.ps1 -List
+```
+
+Run a tagged subset:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\policies\scripts\Test-UniGetUIPolicySamples.ps1 -Tag winget
+```
+
+Run a specific scenario manifest:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\policies\scripts\Test-UniGetUIPolicySamples.ps1 `
+  -ScenarioPath .\policies\samples\scenarios\extended.scenarios.json
 ```
 
 Run a single policy against one or more requests:
@@ -247,7 +268,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\policies\scripts\Invoke-UniGetUI
   -RequestPath .\policies\samples\requests\winget-vscode-install.request.yaml
 ```
 
-The simulator validates JSON or YAML syntax, normalizes YAML to JSON, optionally uses `Test-Json` for JSON Schema validation when available, performs semantic validation, evaluates rules, and prints the selected decision, rule id, and reason. It never runs a real package manager.
+The simulator validates JSON or YAML syntax, normalizes YAML to JSON, optionally uses `Test-Json` for JSON Schema validation when available, performs semantic validation, evaluates rules, and prints the selected decision, rule id, and reason. The sample test runner loads scenario manifests and also asserts expected rule ids when a scenario declares one. It never runs a real package manager.
 
 ## Runtime Integration Notes
 
