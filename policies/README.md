@@ -10,6 +10,8 @@ The initial format covers WinGet and PowerShell Gallery requests. It is intentio
 | --- | --- |
 | `schemas/unigetui.package-policy.schema.1.0.json` | JSON Schema for admin-authored policy files |
 | `schemas/unigetui.package-request.schema.1.0.json` | JSON Schema for canonical unelevated-to-broker package requests |
+| `schemas/unigetui.package-broker-response.schema.1.0.json` | JSON Schema for canonical broker decision responses |
+| `named-pipe-http-wire-protocol.md` | Proposed HTTP-over-named-pipe transport and wire format |
 | `samples/corporate-allowlist.policy.json` | Fail-closed WinGet allow-list sample |
 | `samples/corporate-allowlist.policy.yaml` | YAML form of a fail-closed WinGet allow-list sample |
 | `samples/deny-risky-options.policy.json` | Default-allow policy that denies risky request options |
@@ -17,6 +19,8 @@ The initial format covers WinGet and PowerShell Gallery requests. It is intentio
 | `samples/powershell-advanced.policy.json` | PowerShell source, version-range, and update-operation coverage sample |
 | `samples/scenario-coverage.policy.json` | Focused policy for precedence, version, and constraint scenarios |
 | `samples/requests/winget-vscode-install.request.yaml` | YAML form of a canonical WinGet request sample |
+| `samples/responses/*.response.json` | Canonical broker response samples |
+| `samples/wire/*.http` | Raw HTTP-over-named-pipe request and response examples |
 | `samples/scenarios/*.scenarios.json` | Data-driven scenario manifests with expected decisions and rule ids |
 | `samples/invalid/` | Invalid policy and request fixtures for fail-closed validation scenarios |
 | `scripts/Invoke-UniGetUIPolicySimulation.ps1` | Runs one policy against one or more request files |
@@ -48,6 +52,8 @@ Recommended production behavior is fail closed:
 8. If no rule matches, `enforcement.defaultDecision` is used.
 9. If the final decision is `allow`, the broker builds the package manager command from trusted request fields and the selected UniGetUI manager helper semantics.
 10. If the final decision is `deny`, the broker returns the policy reason to the client and does not run the package manager.
+
+The proposed production transport is HTTP/1.1 over a Windows named pipe, documented in `named-pipe-http-wire-protocol.md`. The request body remains the canonical package request schema, and the response body uses `unigetui.package-broker-response.schema.1.0.json`.
 
 ## Policy Format
 
@@ -315,7 +321,7 @@ dotnet run --project .\policies\csharp\UniGetUI.PolicySimulator.Client\UniGetUI.
   --json
 ```
 
-Allowed responses include `wouldExecute: true` and an `execution.command` array. Denied responses return `wouldExecute: false`, the selected policy rule id, and the denial reason. Invalid policy or request documents fail closed with `decision: deny` and `ruleId: <validation-failure>`. The server accepts JSON and YAML request bodies; the sample client sets the content type based on the request file extension.
+Allowed responses include `wouldExecute: true` and an `execution.command` array. Denied responses return `wouldExecute: false`, the selected policy rule id, and the denial reason. Invalid policy or request documents fail closed with `decision: deny` and `ruleId: <validation-failure>`. The server accepts JSON and YAML request bodies; the sample client sets the content type based on the request file extension. New clients should use `POST /v1/package-operations/evaluate`; `POST /requests` remains as a simulator compatibility alias.
 
 ## Runtime Integration Notes
 

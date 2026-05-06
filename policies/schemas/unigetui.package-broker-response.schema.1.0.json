@@ -1,0 +1,252 @@
+{
+  "$id": "https://aka.ms/unigetui/package-broker-response.schema.1.0.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "UniGetUI Package Broker Response Schema",
+  "description": "Canonical response returned by a UniGetUI package broker after validating and evaluating a package operation request.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "responseVersion",
+    "responseType",
+    "broker",
+    "auditId",
+    "requestId",
+    "receivedAt",
+    "completedAt",
+    "decision",
+    "ruleId",
+    "reason",
+    "wouldExecute",
+    "policy",
+    "execution"
+  ],
+  "properties": {
+    "$schema": {
+      "$ref": "#/$defs/url"
+    },
+    "responseVersion": {
+      "$ref": "#/$defs/semanticVersion"
+    },
+    "responseType": {
+      "type": "string",
+      "const": "packageBrokerResponse"
+    },
+    "broker": {
+      "$ref": "#/$defs/brokerInfo"
+    },
+    "auditId": {
+      "$ref": "#/$defs/resourceId"
+    },
+    "requestId": {
+      "$ref": "#/$defs/nullableResourceId"
+    },
+    "receivedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "completedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "manager": {
+      "$ref": "#/$defs/nullableShortString"
+    },
+    "source": {
+      "$ref": "#/$defs/nullableShortString"
+    },
+    "packageId": {
+      "$ref": "#/$defs/nullablePackageIdentifier"
+    },
+    "operation": {
+      "anyOf": [
+        { "$ref": "#/$defs/operation" },
+        { "type": "null" }
+      ]
+    },
+    "decision": {
+      "$ref": "#/$defs/decision"
+    },
+    "ruleId": {
+      "$ref": "#/$defs/ruleId"
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+    },
+    "wouldExecute": {
+      "type": "boolean"
+    },
+    "policy": {
+      "$ref": "#/$defs/policyInfo"
+    },
+    "execution": {
+      "$ref": "#/$defs/execution"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "decision": { "const": "deny" }
+        }
+      },
+      "then": {
+        "properties": {
+          "wouldExecute": { "const": false },
+          "execution": {
+            "properties": {
+              "command": { "maxItems": 0 }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "decision": { "const": "allow" }
+        }
+      },
+      "then": {
+        "properties": {
+          "wouldExecute": { "const": true },
+          "execution": {
+            "properties": {
+              "command": { "minItems": 1 }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "semanticVersion": {
+      "type": "string",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\\+([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$",
+      "maxLength": 128
+    },
+    "resourceId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "maxLength": 128
+    },
+    "nullableResourceId": {
+      "anyOf": [
+        { "$ref": "#/$defs/resourceId" },
+        { "type": "null" }
+      ]
+    },
+    "url": {
+      "type": "string",
+      "pattern": "^([Hh][Tt][Tt][Pp][Ss]?)://.+$",
+      "maxLength": 2048
+    },
+    "decision": {
+      "type": "string",
+      "enum": ["allow", "deny"]
+    },
+    "operation": {
+      "type": "string",
+      "enum": ["install", "update", "uninstall"]
+    },
+    "nullableShortString": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        { "type": "null" }
+      ]
+    },
+    "packageIdentifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[^\\/:*?\"<>|\\x01-\\x1f]+$"
+    },
+    "nullablePackageIdentifier": {
+      "anyOf": [
+        { "$ref": "#/$defs/packageIdentifier" },
+        { "type": "null" }
+      ]
+    },
+    "ruleId": {
+      "type": "string",
+      "pattern": "^(<default>|<validation-failure>|[A-Za-z0-9][A-Za-z0-9._:-]{0,127})$",
+      "maxLength": 128
+    },
+    "brokerInfo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "protocolVersion", "transport", "elevatedSimulation"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "protocolVersion": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+$"
+        },
+        "transport": {
+          "type": "string",
+          "enum": ["http-named-pipe", "http-loopback-simulator"]
+        },
+        "pipeName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "elevatedSimulation": {
+          "type": "boolean"
+        }
+      }
+    },
+    "policyInfo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "revision", "policyVersion"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/resourceId"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "policyVersion": {
+          "$ref": "#/$defs/semanticVersion"
+        }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "command", "note"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["simulated-elevated", "elevated"]
+        },
+        "command": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "maxItems": 256
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        }
+      }
+    }
+  }
+}
