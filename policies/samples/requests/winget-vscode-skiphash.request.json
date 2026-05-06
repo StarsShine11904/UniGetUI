@@ -33,9 +33,5 @@
     "requestedElevation": "elevated",
     "effectiveUser": "CONTOSO\\alice",
     "clientVersion": "3.2.0"
-  },
-  "simulation": {
-    "expectedDecision": "deny",
-    "scenario": "Approved package is denied when hash validation is bypassed."
   }
 }

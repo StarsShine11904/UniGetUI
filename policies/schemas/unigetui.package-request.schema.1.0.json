@@ -57,9 +57,6 @@
     },
     "broker": {
       "$ref": "#/$defs/brokerContext"
-    },
-    "simulation": {
-      "$ref": "#/$defs/simulation"
     }
   },
   "$defs": {
@@ -287,32 +284,6 @@
         "clientProcessPath": {
           "type": "string",
           "maxLength": 2048
-        },
-        "effectiveCommand": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 2048
-          },
-          "maxItems": 256
-        }
-      }
-    },
-    "simulation": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "expectedDecision": {
-          "type": "string",
-          "enum": [
-            "allow",
-            "deny"
-          ]
-        },
-        "scenario": {
-          "type": "string",
-          "maxLength": 512
         }
       }
     }

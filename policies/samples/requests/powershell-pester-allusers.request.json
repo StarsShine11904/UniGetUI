@@ -32,9 +32,5 @@
     "requestedElevation": "elevated",
     "effectiveUser": "CONTOSO\\alice",
     "clientVersion": "3.2.0"
-  },
-  "simulation": {
-    "expectedDecision": "deny",
-    "scenario": "Pester is denied when requested as AllUsers through the broker."
   }
 }

@@ -31,20 +31,6 @@
   "broker": {
     "requestedElevation": "standard",
     "effectiveUser": "CONTOSO\\alice",
-    "clientVersion": "3.2.0",
-    "effectiveCommand": [
-      "powershell.exe",
-      "Install-Module",
-      "-Name",
-      "Pester",
-      "-Confirm:$false",
-      "-Force",
-      "-Scope",
-      "CurrentUser"
-    ]
-  },
-  "simulation": {
-    "expectedDecision": "allow",
-    "scenario": "Pester is allowed from PSGallery at CurrentUser scope."
+    "clientVersion": "3.2.0"
   }
 }

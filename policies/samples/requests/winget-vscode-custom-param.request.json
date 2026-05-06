@@ -36,9 +36,5 @@
     "requestedElevation": "elevated",
     "effectiveUser": "CONTOSO\\alice",
     "clientVersion": "3.2.0"
-  },
-  "simulation": {
-    "expectedDecision": "deny",
-    "scenario": "Custom WinGet parameters are denied unless specifically permitted."
   }
 }

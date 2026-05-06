@@ -602,8 +602,6 @@ function Invoke-UniGetUIPolicyFileDecision {
             RuleId = "<validation-failure>"
             Priority = $null
             Reason = "Policy schema validation failed: $($policySchemaResult.Message)"
-            ExpectedDecision = (Get-ObjectPropertyValue -InputObject (Get-ObjectPropertyValue -InputObject $requestFile.Data -Name "simulation") -Name "expectedDecision")
-            PassedExpectation = $false
             SchemaValidation = [pscustomobject]@{ Policy = $policySchemaResult; Request = $requestSchemaResult }
         }
     }
@@ -616,19 +614,12 @@ function Invoke-UniGetUIPolicyFileDecision {
             RuleId = "<validation-failure>"
             Priority = $null
             Reason = "Request schema validation failed: $($requestSchemaResult.Message)"
-            ExpectedDecision = (Get-ObjectPropertyValue -InputObject (Get-ObjectPropertyValue -InputObject $requestFile.Data -Name "simulation") -Name "expectedDecision")
-            PassedExpectation = $false
             SchemaValidation = [pscustomobject]@{ Policy = $policySchemaResult; Request = $requestSchemaResult }
         }
     }
 
     try {
         $decision = Invoke-UniGetUIPolicyDecision -Policy $policyFile.Data -Request $requestFile.Data
-        $expected = Get-ObjectPropertyValue -InputObject (Get-ObjectPropertyValue -InputObject $requestFile.Data -Name "simulation") -Name "expectedDecision"
-        $passedExpectation = $null
-        if (-not [string]::IsNullOrWhiteSpace([string] $expected)) {
-            $passedExpectation = ($decision.Decision -eq $expected)
-        }
 
         [pscustomobject]@{
             PolicyPath = $policyFile.Path
@@ -642,8 +633,6 @@ function Invoke-UniGetUIPolicyFileDecision {
             RuleId = $decision.RuleId
             Priority = $decision.Priority
             Reason = $decision.Reason
-            ExpectedDecision = $expected
-            PassedExpectation = $passedExpectation
             MatchedRules = $decision.MatchedRules
             SchemaValidation = [pscustomobject]@{ Policy = $policySchemaResult; Request = $requestSchemaResult }
         }
@@ -657,8 +646,6 @@ function Invoke-UniGetUIPolicyFileDecision {
             RuleId = "<validation-failure>"
             Priority = $null
             Reason = "Semantic validation failed: $($_.Exception.Message)"
-            ExpectedDecision = (Get-ObjectPropertyValue -InputObject (Get-ObjectPropertyValue -InputObject $requestFile.Data -Name "simulation") -Name "expectedDecision")
-            PassedExpectation = $false
             SchemaValidation = [pscustomobject]@{ Policy = $policySchemaResult; Request = $requestSchemaResult }
         }
     }

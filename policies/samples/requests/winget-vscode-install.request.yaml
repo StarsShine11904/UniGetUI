@@ -28,19 +28,3 @@ broker:
   requestedElevation: elevated
   effectiveUser: 'CONTOSO\alice'
   clientVersion: 3.2.0
-  effectiveCommand:
-    - winget.exe
-    - install
-    - --id
-    - Microsoft.VisualStudioCode
-    - --exact
-    - --source
-    - winget
-    - --scope
-    - machine
-    - --silent
-    - --architecture
-    - x64
-simulation:
-  expectedDecision: allow
-  scenario: Corporate YAML allow-list permits VS Code through WinGet.

@@ -175,7 +175,7 @@ A request file models what the unelevated executable asks the elevated broker to
 }
 ```
 
-The `broker.effectiveCommand` field can appear in samples for audit readability, but a runtime broker should build the final command from validated request fields and UniGetUI manager helpers instead of trusting a client-supplied command string.
+The request schema intentionally does not include a client-supplied command field. Runtime brokers and simulators should build the final command from validated request fields and UniGetUI manager helpers instead of trusting command text from the client.
 
 ## Manager Mapping
 

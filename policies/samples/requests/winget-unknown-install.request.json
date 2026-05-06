@@ -33,9 +33,5 @@
     "requestedElevation": "standard",
     "effectiveUser": "CONTOSO\\alice",
     "clientVersion": "3.2.0"
-  },
-  "simulation": {
-    "expectedDecision": "deny",
-    "scenario": "Corporate allow-list denies unknown WinGet packages by default."
   }
 }

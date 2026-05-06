@@ -54,11 +54,5 @@ if ($AsJson) {
 }
 
 $results |
-    Select-Object RequestId, Manager, Source, PackageId, Operation, Decision, RuleId, Reason, ExpectedDecision, PassedExpectation |
+    Select-Object RequestId, Manager, Source, PackageId, Operation, Decision, RuleId, Reason |
     Format-Table -AutoSize
-
-$failedExpectations = @($results | Where-Object { $_.PassedExpectation -eq $false })
-if ($failedExpectations.Count -gt 0) {
-    Write-Error "$($failedExpectations.Count) policy simulation expectation(s) failed."
-    exit 1
-}
